@@ -258,8 +258,8 @@ def screening_job_detail(job_id: int):
 
         rows = (
             db.query(ScreeningResult, Transaction, SanctionEntity)
-            .join(Transaction, ScreeningResult.transaction_id == Transaction.id)
-            .join(SanctionEntity, ScreeningResult.sanction_entity_id == SanctionEntity.id)
+            .outerjoin(Transaction, ScreeningResult.transaction_id == Transaction.id)
+            .outerjoin(SanctionEntity, ScreeningResult.sanction_entity_id == SanctionEntity.id)
             .filter(ScreeningResult.job_id == job_id)
             .order_by(ScreeningResult.final_score.desc())
             .limit(500)

@@ -8,6 +8,8 @@ import pandas as pd
 from slis.models import UploadBatch, Transaction
 from slis.matching import normalize_name
 
+import io
+
 
 def _clean_str(val: Any) -> str | None:
 
@@ -93,17 +95,40 @@ def create_transaction_batch(
     if hasattr(file_obj, "seek"):
         file_obj.seek(0)
 
+    raw_bytes = file_obj.read()
     
-    raw_stream = getattr(file_obj, "stream", file_obj)
+    if not raw_bytes:
+        batch.row_count = 0
+        db.commit()
+        return batch
+    
+    content_str = ""
+    encodings = ['utf-8', 'utf-16', 'latin-1']
+    
+    for enc in encodings:
+        try:
+            content_str = raw_bytes.decode(enc)
+            break 
+        except ( UnicodeError):
+            continue
+    
+    if not content_str:
+        raise ValueError("File encoding tidak didukung. Harap gunakan format UTF-8 atau UTF-16.")
 
     
-    df = pd.read_csv(
-        raw_stream,
-        sep="|",
-        dtype=str,
-        engine="python",
-    )
-    df = df.fillna("")
+    # raw_stream = getattr(file_obj, "stream", file_obj)
+
+    
+    try:
+        df = pd.read_csv(
+            io.StringIO(content_str),
+            sep="|",
+            dtype=str,
+            engine="python",
+        )
+        df = df.fillna("")
+    except Exception as e:
+        raise ValueError(f"Gagal memproses struktur file: {str(e)}")
 
     rows_to_insert: list[Transaction] = []
     row_count = 0

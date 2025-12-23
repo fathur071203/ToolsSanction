@@ -22,6 +22,7 @@ slis/uploads/
 uploads/
 *.csv
 *.txt
+!requirements.txt
 *.xlsx
 *.xls
 

@@ -366,11 +366,20 @@
   <button class="btn btn-primary" disabled style="opacity: 0.6;">Export Hasil (Coming Soon)</button>
 </div>
 
+<script id="results-data" type="application/json">
+  {{ results|tojson|safe }}
+</script>
+
 <script>
   
   const rawResultsData = document.getElementById('results-data').textContent;
-  const rawResults = JSON.parse(rawResultsData) || [];  
-  // Group by transaction_id
+  let rawResults = [];
+  try {
+    rawResults = JSON.parse(rawResultsData) || [];
+  } catch (e) {
+    console.error("Gagal parsing JSON data:", e);
+  }
+
   const transactionGroups = {};
   rawResults.forEach(result => {
     const txId = result.transaction_id;
