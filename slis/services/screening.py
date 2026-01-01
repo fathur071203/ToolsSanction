@@ -4,7 +4,6 @@ from datetime import date, datetime, timezone
 from typing import List, Optional
 
 import logging
-import jellyfish
 import re
 
 import os
@@ -13,7 +12,7 @@ from typing import List, Dict, Any, Optional
 
 from slis.matching.geo import generate_geographic_insights
 
-DEV_FAST_MODE = os.getenv("SLIS_DEV_FAST_MODE", "1") == "1"
+DEV_FAST_MODE = os.getenv("SLIS_DEV_FAST_MODE", "0") == "1"
 DEV_MAX_TRANSACTIONS = int(os.getenv("SLIS_DEV_MAX_TRANSACTIONS", "20"))
 DEV_MAX_SANCTIONS = int(os.getenv("SLIS_DEV_MAX_SANCTIONS", "200"))
 
@@ -26,6 +25,11 @@ from slis.models import (
 )
 
 from slis.matching.dob import calculate_dob_score_flexible
+from slis.matching.names import (
+    HybridNameIndex,
+    calculate_advanced_name_score_normed,
+    normalize_name,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -33,11 +37,7 @@ logger = logging.getLogger(__name__)
 
 def _normalize_name(name: Optional[str]) -> str:
     """Normalisasi nama: lowercase, buang simbol, rapikan spasi."""
-    if not name:
-        return ""
-    s = name.lower().strip()
-    s = re.sub(r"[^a-z0-9\s]", "", s)
-    return " ".join(s.split())
+    return normalize_name(name or "")
 
 def _normalize_country(value: Optional[str]) -> str:
     """Normalisasi citizenship/country (ID, Indonesia -> id / indonesia)."""
@@ -104,14 +104,14 @@ def get_sanction_name(s: SanctionEntity) -> str:
 
 
 def compute_name_score(name1: str | None, name2: str | None) -> float:
-    """Skor nama pakai Jaro-Winkler (0–100)."""
+    """Skor nama (0–100) pakai RapidFuzz."""
     if not name1 or not name2:
         return 0.0
     n1 = _normalize_name(name1)
     n2 = _normalize_name(name2)
     if not n1 or not n2:
         return 0.0
-    return float(jellyfish.jaro_winkler_similarity(n1, n2) * 100.0)
+    return float(calculate_advanced_name_score_normed(n1, n2))
 
 def combine_scores(
     name_score: float,
@@ -207,15 +207,29 @@ def run_screening_for_job(db, job_id: int) -> None:
 
     logger.info("Mulai screening job_id=%s, batch_id=%s", job.id, job.batch_id)
     job.status = "RUNNING"
+    job.started_at = datetime.now(timezone.utc)
     job.finished_at = None
+    job.error_message = None
+    job.processed_transactions = 0
+    job.progress_percentage = 0.0
     db.add(job)
     db.commit()
 
     try:
-        tx_query = db.query(Transaction).filter(Transaction.batch_id == job.batch_id)
+        tx_query_base = (
+            db.query(Transaction)
+            .filter(Transaction.batch_id == job.batch_id)
+            .order_by(Transaction.id.asc())
+        )
+
+        # Full run by default (no artificial limit). Optional DEV_FAST_MODE remains opt-in.
         if DEV_FAST_MODE:
-            tx_query = tx_query.limit(DEV_MAX_TRANSACTIONS)
-        txs: List[Transaction] = tx_query.all()
+            tx_query_base = tx_query_base.limit(DEV_MAX_TRANSACTIONS)
+
+        total_transactions = tx_query_base.count()
+        job.total_transactions = int(total_transactions or 0)
+        db.add(job)
+        db.commit()
         
         sanctions_query = db.query(SanctionEntity).filter(SanctionEntity.is_active.is_(True))
         if DEV_FAST_MODE:
@@ -223,12 +237,14 @@ def run_screening_for_job(db, job_id: int) -> None:
         sanctions: List[SanctionEntity] = sanctions_query.all()
 
         raw_sanction_count = len(sanctions)
-        job.total_transactions = len(txs)
+        # total_transactions already set from count()
         
-        if not txs or not sanctions:
+        if total_transactions <= 0 or not sanctions:
             job.total_sanctions = raw_sanction_count
             job.status = "DONE"
             job.total_matches = 0
+            job.processed_transactions = 0
+            job.progress_percentage = 100.0 if total_transactions <= 0 else 0.0
             job.finished_at = datetime.now(timezone.utc)
             db.add(job)
             db.commit()
@@ -260,6 +276,8 @@ def run_screening_for_job(db, job_id: int) -> None:
                 }
 
         sanction_list_data = list(unique_sanction_map.values())
+
+        sanction_index = HybridNameIndex([s["name_norm"] for s in sanction_list_data])
         
         job.total_sanctions = len(sanction_list_data)
         db.add(job)
@@ -268,8 +286,29 @@ def run_screening_for_job(db, job_id: int) -> None:
         logger.info(f"Deduplikasi Sanksi: {raw_sanction_count} raw -> {len(sanction_list_data)} unique.")
 
         results_to_insert: List[ScreeningResult] = []
+        total_matches = 0
+        processed_count = 0
 
-        for tx in txs:
+        BATCH_SIZE = 500
+        offset = 0
+        update_frequency = 10 if total_transactions < 200 else 50
+
+        while True:
+            # Allow cancellation
+            db.expire(job)
+            if job.status == "CANCELED":
+                job.finished_at = job.finished_at or datetime.now(timezone.utc)
+                db.add(job)
+                db.commit()
+                return
+
+            tx_chunk = tx_query_base.limit(BATCH_SIZE).offset(offset).all()
+            if not tx_chunk:
+                break
+
+            for tx in tx_chunk:
+                processed_count += 1
+
             parties = [
                 ("sender", get_transaction_name(tx, "sender")),
                 ("receiver", get_transaction_name(tx, "receiver"))
@@ -285,15 +324,18 @@ def run_screening_for_job(db, job_id: int) -> None:
                     "cit_norm": None
                 }
 
+                candidate_idxs = sanction_index.filter_indices(query_data["name_norm"])
+
                 # Loop hanya ke data sanksi yang SUDAH UNIK
-                for s_data in sanction_list_data:
+                for idx in candidate_idxs:
+                    s_data = sanction_list_data[idx]
                     match = _match_single_entity(query_data, s_data, thresholds)
                     if match:
                         res = ScreeningResult(
                             job_id=job.id,
                             transaction_id=tx.id,
                             sanction_entity_id=match["sanction_id"],
-                            sanction_source_id=match["sanction_id"], 
+                            sanction_source_id=s_data.get("source_id"),
                             target_role=role,
                             name_score=match["name_score"],
                             dob_score=match["dob_score"],
@@ -302,6 +344,7 @@ def run_screening_for_job(db, job_id: int) -> None:
                             geographic_insights=match["geographic_insights"]
                         )
                         results_to_insert.append(res)
+                        total_matches += 1
 
             # Flush Batch Insert
             if len(results_to_insert) >= 1000:
@@ -310,16 +353,28 @@ def run_screening_for_job(db, job_id: int) -> None:
                 logger.info("Flushed 1000 screening results ke DB")
                 results_to_insert.clear()
 
+            # Persist progress for UI polling (DB-backed)
+            if processed_count % update_frequency == 0 or processed_count == total_transactions:
+                job.processed_transactions = processed_count
+                safe_total = total_transactions if total_transactions > 0 else 1
+                job.progress_percentage = float((processed_count / safe_total) * 100)
+                job.total_matches = total_matches
+                db.add(job)
+                db.commit()
+
+            offset += BATCH_SIZE
+
         # Final Flush
         if results_to_insert:
             db.bulk_save_objects(results_to_insert)
             db.commit()
 
         # Summary
-        total_matches = db.query(ScreeningResult).filter(ScreeningResult.job_id == job.id).count()
+        job.processed_transactions = processed_count
         job.total_matches = total_matches
         job.status = "DONE"
         job.finished_at = datetime.now(timezone.utc)
+        job.progress_percentage = 100.0
         db.add(job)
         db.commit()
 
@@ -330,8 +385,10 @@ def run_screening_for_job(db, job_id: int) -> None:
         db.rollback()
         job = db.get(ScreeningJob, job_id)
         if job:
-            job.status = "FAILED"
+            if job.status != "CANCELED":
+                job.status = "FAILED"
             job.error_message = "Internal error saat screening (lihat log backend)."
+            job.finished_at = datetime.now(timezone.utc)
             db.commit()
 
 
@@ -365,6 +422,8 @@ def search_single_entity(
             
     sanction_list_data = list(unique_sanction_map.values())
 
+    sanction_index = HybridNameIndex([s["name_norm"] for s in sanction_list_data])
+
     query_data = {
         "name_norm": _normalize_name(query_name),
         "dob": _parse_dob(dob) if dob else None,
@@ -375,7 +434,9 @@ def search_single_entity(
     thresholds = {"name": name_threshold, "final": final_threshold}
     matches = []
 
-    for s_data in sanction_list_data:
+    candidate_idxs = sanction_index.filter_indices(query_data["name_norm"])
+    for idx in candidate_idxs:
+        s_data = sanction_list_data[idx]
         match = _match_single_entity(query_data, s_data, thresholds)
         if match:
             matches.append(match)
@@ -409,6 +470,8 @@ def search_entities_bulk(
             
     sanction_list_data = list(unique_sanction_map.values())
 
+    sanction_index = HybridNameIndex([s["name_norm"] for s in sanction_list_data])
+
     thresholds = {"name": name_threshold, "final": final_threshold}
     bulk_results = []
 
@@ -428,7 +491,10 @@ def search_entities_bulk(
         }
         
         matches = []
-        for s_data in sanction_list_data:
+
+        candidate_idxs = sanction_index.filter_indices(query_data["name_norm"])
+        for idx in candidate_idxs:
+            s_data = sanction_list_data[idx]
             match = _match_single_entity(query_data, s_data, thresholds)
             if match:
                 matches.append(match)

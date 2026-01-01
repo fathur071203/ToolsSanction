@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Tuple
 
-from .names import calculate_advanced_name_score
+from .names import calculate_advanced_name_score_normed, normalize_name, HybridNameIndex
 from .dob import calculate_dob_score_flexible
 from .geo import generate_geographic_insights
 from .utils import normalize_and_compare
@@ -145,6 +145,28 @@ def run_screening_engine(
 
     results: List[Dict[str, Any]] = []
 
+    # Precompute sanction payloads + GPU/CPU index once per call
+    sanction_payloads: List[Dict[str, Any]] = []
+    sanction_name_norms: List[str] = []
+    for sanc in sanctions:
+        sanc_fields = _extract_sanction_fields(sanc)
+        full_name = sanc_fields["full_name"]
+        if not full_name:
+            continue
+        name_norm = normalize_name(full_name)
+        if not name_norm:
+            continue
+        payload = dict(sanc)
+        payload["__slis_full_name"] = full_name
+        payload["__slis_name_norm"] = name_norm
+        payload["__slis_source_list"] = sanc_fields["source_list"]
+        payload["__slis_date_of_birth"] = sanc_fields["date_of_birth"]
+        payload["__slis_citizenship"] = sanc_fields["citizenship"]
+        sanction_payloads.append(payload)
+        sanction_name_norms.append(name_norm)
+
+    sanction_index = HybridNameIndex(sanction_name_norms)
+
     for customer in customers:
         customer.setdefault("Country_of_Residence", customer.get("country_of_residence", ""))
         customer.setdefault("Place_of_Birth", customer.get("place_of_birth", ""))
@@ -157,19 +179,18 @@ def run_screening_engine(
             
             continue
 
-        for sanc in sanctions:
-            sanc_fields = _extract_sanction_fields(sanc)
+        customer_norm = normalize_name(customer_name)
+        if not customer_norm:
+            continue
 
-            
-            if not sanc_fields["full_name"]:
-                continue
+        candidate_idxs = sanction_index.filter_indices(customer_norm)
+        for idx in candidate_idxs:
+            sanc_payload = sanction_payloads[idx]
+            source_list = sanc_payload["__slis_source_list"]
 
-            source_list = sanc_fields["source_list"]
-
-            
-            name_score = calculate_advanced_name_score(
-                customer_name,
-                sanc_fields["full_name"],
+            name_score = calculate_advanced_name_score_normed(
+                customer_norm,
+                sanc_payload["__slis_name_norm"],
             )
 
             
@@ -178,14 +199,14 @@ def run_screening_engine(
 
             
 
-            has_dob = bool(cust_fields["dob"] and sanc_fields["date_of_birth"])
-            has_cit = bool(cust_fields["citizenship"] and sanc_fields["citizenship"])
+            has_dob = bool(cust_fields["dob"] and sanc_payload["__slis_date_of_birth"])
+            has_cit = bool(cust_fields["citizenship"] and sanc_payload["__slis_citizenship"])
 
             
             if has_dob:
                 dob_score, dob_match_type = calculate_dob_score_flexible(
                     cust_fields["dob"],
-                    sanc_fields["date_of_birth"],
+                    sanc_payload["__slis_date_of_birth"],
                     source_list,
                 )
             else:
@@ -195,7 +216,7 @@ def run_screening_engine(
             if has_cit:
                 citizenship_score = normalize_and_compare(
                     cust_fields["citizenship"],
-                    sanc_fields["citizenship"],
+                    sanc_payload["__slis_citizenship"],
                 )
             else:
                 citizenship_score = 0
@@ -220,7 +241,7 @@ def run_screening_engine(
             }
 
             sanction_geo_payload = {
-                "Citizenship": sanc_fields["citizenship"],
+                "Citizenship": sanc_payload["__slis_citizenship"],
             }
 
             geo_insights = generate_geographic_insights(
@@ -240,7 +261,7 @@ def run_screening_engine(
                     "Sanction_Id": sanc.get("id") or sanc.get("sanction_id"),
 
                     "Customer_Name": customer_name,
-                    "Matched_Sanction_Name": sanc_fields["full_name"],
+                    "Matched_Sanction_Name": sanc_payload["__slis_full_name"],
                     "Source_List": source_list,
 
                     "Final_Score": final_score,
@@ -250,9 +271,9 @@ def run_screening_engine(
                     "Citizenship_Score": citizenship_score,
 
                     "Customer_DOB": cust_fields["dob"],
-                    "Sanction_DOB": sanc_fields["date_of_birth"],
+                    "Sanction_DOB": sanc_payload["__slis_date_of_birth"],
                     "Customer_Citizenship": cust_fields["citizenship"],
-                    "Sanction_Citizenship": sanc_fields["citizenship"],
+                    "Sanction_Citizenship": sanc_payload["__slis_citizenship"],
 
                     "Exact_Matches": ", ".join(exact_matches_found) if exact_matches_found else "None",
 

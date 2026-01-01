@@ -12,7 +12,11 @@ from slis.models import (
     SanctionEntity,
     ScreeningResult,
 )
-from slis.matching.names import normalize_name, calculate_advanced_name_score
+from slis.matching.names import (
+    normalize_name,
+    calculate_advanced_name_score_normed,
+    HybridNameIndex,
+)
 from slis.matching.geo import generate_geographic_insights
 from slis.matching.dob import calculate_dob_score_flexible
 
@@ -70,7 +74,7 @@ def run_screening_task(self, job_id: int) -> dict:
         # 1. Update status awal
         job.celery_task_id = self.request.id
         job.status = "RUNNING"
-        job.started_at = datetime.now(timezone.utc),
+        job.started_at = datetime.now(timezone.utc)
         db.commit()
 
         # Threshold settings
@@ -95,7 +99,11 @@ def run_screening_task(self, job_id: int) -> dict:
                 "name_norm": norm_name,
                 "dob_raw": s.date_of_birth_raw,
                 "citizenship": s.citizenship,
+                "citizenship_norm": s.citizenship_normalized or normalize_country_code(s.citizenship),
+                "source_code": s.source.code if getattr(s, "source", None) else "UNKNOWN",
             })
+
+        sanction_index = HybridNameIndex([s["name_norm"] for s in sanction_rows])
 
         # Update info job
         job.total_transactions = total_transactions
@@ -132,6 +140,19 @@ def run_screening_task(self, job_id: int) -> dict:
 
             for tx in tx_chunk:
                 processed_count += 1
+
+                # Allow cancellation (checked at a low frequency)
+                if processed_count % 25 == 0:
+                    db.expire(job)
+                    if job.status == "CANCELED":
+                        logger.info(f"[job={job_id}] Canceled by user")
+                        self.update_state(state='REVOKED', meta={
+                            'current': processed_count,
+                            'total': total_transactions,
+                            'percent': int((processed_count / (total_transactions or 1)) * 100),
+                            'matches': total_matches
+                        })
+                        return {"job_id": job_id, "status": "CANCELED"}
                 
                 # Cek Sender dan Receiver
                 parties = [
@@ -163,9 +184,11 @@ def run_screening_task(self, job_id: int) -> dict:
                     tx_dob_val = p["dob"]
                     tx_country_norm = normalize_country_code(p["country"])
 
-                    for s in sanction_rows:
+                    candidate_idxs = sanction_index.filter_indices(target_norm)
+                    for idx in candidate_idxs:
+                        s = sanction_rows[idx]
                         # 1. Name Score
-                        name_score = calculate_advanced_name_score(target_norm, s["name_norm"])
+                        name_score = calculate_advanced_name_score_normed(target_norm, s["name_norm"])
                         if name_score < name_threshold: continue
 
                         # 2. DOB Score Logic

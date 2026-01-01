@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Service Redis
   redis:
@@ -22,6 +20,7 @@ services:
       - FLASK_DEBUG=1
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SLIS_DEV_FAST_MODE=0
     depends_on:
       - redis
       - worker
@@ -39,6 +38,7 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SLIS_DEV_FAST_MODE=0
     depends_on:
       - redis
     volumes:

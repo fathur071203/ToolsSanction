@@ -43,6 +43,10 @@ def create_screening_job():
             args=[job.id],
         )
 
+        # Persist task id for progress/cancel while still PENDING
+        job.celery_task_id = async_result.id
+        db.commit()
+
         return jsonify(
             {
                 "job_id": job.id,
@@ -50,6 +54,40 @@ def create_screening_job():
                 "status": job.status,
             }
         )
+    finally:
+        db.close()
+
+
+@screening_bp.route("/jobs/<int:job_id>/cancel", methods=["POST"])
+def cancel_screening_job(job_id: int):
+    db = SessionLocal()
+    try:
+        job = db.get(ScreeningJob, job_id)
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+
+        if job.status in ["SUCCESS", "DONE", "FAILURE", "FAILED", "CANCELED"]:
+            return jsonify({
+                "job_id": job.id,
+                "status": job.status,
+                "message": "Job already finished"
+            }), 409
+
+        # Mark as canceled first (so worker can observe it)
+        job.status = "CANCELED"
+        job.finished_at = datetime.now(timezone.utc)
+        if not job.error_message:
+            job.error_message = "Canceled by user"
+        db.commit()
+
+        if job.celery_task_id:
+            try:
+                celery_app.control.revoke(job.celery_task_id, terminate=True, signal="SIGTERM")
+            except Exception:
+                # Even if revoke fails, we keep DB as CANCELED
+                pass
+
+        return jsonify({"job_id": job.id, "status": "CANCELED"})
     finally:
         db.close()
 

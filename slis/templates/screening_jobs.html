@@ -28,11 +28,13 @@
           </tr>
         </thead>
         <tbody>
-          {% for j in jobs %} {% set is_finished = j.status == 'SUCCESS' or
-          j.status == 'DONE' %} {% set bar_width = 100 if is_finished else
-          (j.progress_percentage or 0) %} {% set bar_class = 'bg-success' if
-          is_finished else ('progress-bar-animated bg-warning' if j.status ==
-          'RUNNING' else 'bg-secondary') %}
+          {% for j in jobs %}
+          {% set is_success = j.status in ['SUCCESS', 'DONE'] %}
+          {% set is_failure = j.status in ['FAILURE', 'FAILED'] %}
+          {% set is_canceled = j.status == 'CANCELED' %}
+          {% set is_finished = is_success or is_failure or is_canceled %}
+          {% set bar_width = 100 if is_success else (j.progress_percentage or 0) %}
+          {% set bar_class = 'bg-success' if is_success else ('bg-danger' if is_failure else ('bg-secondary' if is_canceled else ('progress-bar-animated bg-warning' if j.status == 'RUNNING' else 'bg-secondary'))) %}
 
           <tr
             data-job-id="{{ j.id }}"
@@ -42,12 +44,14 @@
             <td><strong>#{{ j.id }}</strong></td>
             <td>Batch #{{ j.batch_id }}</td>
             <td>
-              {% if j.status == 'SUCCESS' %}
+              {% if is_success %}
               <span class="badge bg-success">SUCCESS</span>
-              {% elif j.status == 'FAILURE' %}
+              {% elif is_failure %}
               <span class="badge bg-danger">FAILURE</span>
               {% elif j.status == 'RUNNING' %}
               <span class="badge bg-warning text-dark">RUNNING</span>
+              {% elif is_canceled %}
+              <span class="badge bg-secondary">CANCELED</span>
               {% else %}
               <span class="badge bg-secondary">{{ j.status }}</span>
               {% endif %}
@@ -73,7 +77,7 @@
             </td>
             <td class="transactions-info">
               <span class="processed fw-bold">
-                {{ j.total_transactions if is_finished else
+                {{ j.total_transactions if is_success else
                 (j.processed_transactions or 0) }}
               </span>
               <span class="text-muted small">/</span>
@@ -94,16 +98,27 @@
               '-' }}
             </td>
             <td>
-              {% if j.status == 'SUCCESS' %}
+              {% if is_success %}
               <a
                 href="{{ url_for('web.screening_job_detail', job_id=j.id) }}"
                 class="btn btn-sm btn-primary"
               >
                 Lihat Hasil
               </a>
-              {% elif j.status == 'FAILURE' %}
+              {% elif is_failure %}
               <button class="btn btn-sm btn-outline-danger" disabled>
                 Error
+              </button>
+              {% elif j.status in ['RUNNING', 'PENDING'] %}
+              <button
+                class="btn btn-sm btn-outline-danger"
+                onclick="cancelJob({{ j.id }})"
+              >
+                Batalkan
+              </button>
+              {% elif is_canceled %}
+              <button class="btn btn-sm btn-outline-secondary" disabled>
+                Dibatalkan
               </button>
               {% else %}
               <button class="btn btn-sm btn-outline-secondary" disabled>
@@ -134,6 +149,26 @@
   document.addEventListener("DOMContentLoaded", function () {
     const runningRows = document.querySelectorAll('tr[data-status="RUNNING"]');
     const jobIds = Array.from(runningRows).map((row) => row.dataset.jobId);
+
+    window.cancelJob = async function (jobId) {
+      const ok = confirm(`Batalkan job #${jobId}?`);
+      if (!ok) return;
+
+      try {
+        const resp = await fetch(`/api/screening/jobs/${jobId}/cancel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          alert(data.error || `Gagal membatalkan job (HTTP ${resp.status})`);
+          return;
+        }
+        setTimeout(() => location.reload(), 300);
+      } catch (e) {
+        alert(`Network error: ${e}`);
+      }
+    };
 
     if (jobIds.length > 0) {
       console.log("Monitoring jobs:", jobIds);
@@ -203,7 +238,7 @@
 
               // 4. Auto Reload jika Status Berubah (Selesai/Gagal)
               // Kita cek jika status data berbeda dengan status di atribut HTML awal
-              if (data.status === "SUCCESS" || data.status === "FAILURE") {
+              if (data.status === "SUCCESS" || data.status === "FAILURE" || data.status === "CANCELED") {
                 console.log(
                   `Job ${jobId} finished with status ${data.status}. Reloading...`
                 );

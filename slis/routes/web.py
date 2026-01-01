@@ -184,6 +184,10 @@ def screening_start():
                 args=[job.id],
             )
 
+            # Simpan celery_task_id agar progress/cancel bisa bekerja saat masih PENDING
+            job.celery_task_id = async_result.id
+            db.commit()
+
             flash(f"Screening Job #{job.id} sedang berjalan...", "success")
             return redirect(url_for("web.screening_jobs"))
        
