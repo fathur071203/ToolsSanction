@@ -24,7 +24,7 @@
     font-size: 0.95rem;
   }
 
-  /* Progress Bar */
+  /* Progress Bar UI Steps (Top Indicator) */
   .progress-indicator {
     display: flex;
     justify-content: space-between;
@@ -351,7 +351,6 @@
     </div>
   </div>
 
-  <!-- Form -->
   <div class="form-card">
     <div class="form-section-title">
       <div class="form-section-icon">⚙️</div>
@@ -359,7 +358,6 @@
     </div>
 
     <form method="post" action="{{ url_for('web.screening_start') }}" enctype="multipart/form-data" id="bulkScreeningForm">
-      <!-- Transaction Source Selection -->
       <div class="form-group">
         <label class="form-label">
           Sumber Data Transaksi
@@ -380,7 +378,6 @@
         <input type="hidden" name="transaction_source" id="transactionSourceInput" value="batch">
       </div>
 
-      <!-- Batch Selection (conditional) -->
       <div id="batchSelectSection" style="display: block;">
         <div class="form-group">
           <label class="form-label">
@@ -399,7 +396,6 @@
         </div>
       </div>
 
-      <!-- Transaction Upload (conditional) -->
       <div id="transactionUploadSection" style="display: none;">
         <div class="form-group">
           <label class="form-label">
@@ -416,7 +412,6 @@
         </div>
       </div>
 
-      <!-- Name Score Threshold -->
       <div class="form-group" style="margin-top: 2rem;">
         <label class="form-label">Ambang Batas Skor Nama</label>
         <div class="threshold-group">
@@ -434,7 +429,6 @@
         </div>
       </div>
 
-      <!-- Final Score Threshold -->
       <div class="form-group">
         <label class="form-label">Ambang Batas Skor Akhir</label>
         <div class="threshold-group">
@@ -452,7 +446,6 @@
         </div>
       </div>
 
-      <!-- Officer Information -->
       <div class="form-group">
         <label class="form-label">
           Nama Petugas
@@ -462,7 +455,6 @@
         <div class="form-text">Untuk audit trail dan pencatatan petugas</div>
       </div>
 
-      <!-- Info Box -->
       <div class="info-box" style="margin-top: 1.5rem;">
         <strong>Catatan Penting:</strong>
         <ul style="margin-bottom: 0;">
@@ -472,7 +464,24 @@
         </ul>
       </div>
 
-      <!-- Form Actions -->
+      <div id="uploadProgressContainer" style="display: none; margin-bottom: 1.5rem;">
+        <div class="d-flex justify-content-between mb-1">
+          <span id="progressStatusLabel" class="text-muted small fw-bold">Mengupload ke Server...</span>
+          
+          <span id="progressPercentText" class="text-primary small fw-bold">0%</span>
+        </div>
+        <div class="progress" style="height: 12px;">
+          <div id="uploadProgressBar" 
+               class="progress-bar progress-bar-striped progress-bar-animated" 
+               role="progressbar" 
+               style="width: 0%">
+          </div>
+        </div>
+        <div id="progressWarning" class="form-text text-warning small mt-2">
+          ⚠️ Jangan tutup atau refresh halaman ini sampai proses selesai.
+        </div>
+      </div>
+      
       <div class="form-actions">
         <a href="{{ url_for('web.index') }}" class="btn btn-cancel">Batal</a>
         <button type="submit" class="btn btn-primary" id="submitBtn">Mulai Screening</button>
@@ -482,10 +491,11 @@
 </div>
 
 <script>
+  let simulationInterval;
+
   function selectTransactionSource(source) {
     document.getElementById('sourceBatch').classList.remove('active');
     document.getElementById('sourceTransactionUpload').classList.remove('active');
-    
     document.getElementById('transactionSourceInput').value = source;
     
     if (source === 'batch') {
@@ -511,31 +521,130 @@
     }
   }
 
-  function updateThresholdDisplay(value, displayId, recommendationId) {
-    const display = document.getElementById(displayId);
-    const recommendation = document.getElementById(recommendationId);
+  // --- FUNGSI SIMULASI PROGRESS DB ---
+  function startDBSimulation() {
+    const progressBar = document.getElementById('uploadProgressBar');
+    const progressText = document.getElementById('progressPercentText');
+    const statusLabel = document.getElementById('progressStatusLabel');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // 1. Ubah Status UI
+    statusLabel.textContent = 'Menyimpan & Memproses Data di Database...';
+    statusLabel.classList.add('text-success');
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Memproses Database...';
     
-    display.textContent = value + '%';
+    // Ganti warna bar jadi hijau (Processing state)
+    progressBar.classList.remove('bg-primary');
+    progressBar.classList.add('bg-success');
     
-    if (value < 50) {
-      recommendation.innerHTML = '<strong>Luas:</strong> Threshold rendah, akan menangkap banyak potential matches';
-      recommendation.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-      recommendation.style.borderColor = '#ef4444';
-    } else if (value >= 50 && value < 75) {
-      recommendation.innerHTML = '<strong>Rekomendasi:</strong> Threshold moderat untuk screening balanced';
-      recommendation.style.backgroundColor = 'rgba(251, 191, 36, 0.1)';
-      recommendation.style.borderColor = '#f59e0b';
-    } else {
-      recommendation.innerHTML = '<strong>Ketat:</strong> Threshold tinggi, hanya matches dengan confidence tinggi';
-      recommendation.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
-      recommendation.style.borderColor = '#10b981';
-    }
+    // 2. Reset Bar ke 0 untuk fase baru (Processing)
+    let fakeProgress = 0;
+    progressBar.style.width = '0%';
+    progressText.textContent = '0%';
+
+    // 3. Jalankan Animasi Fake Progress
+    // Trik: Cepat di awal, melambat di akhir (Logarithmic like)
+    simulationInterval = setInterval(() => {
+        // Logika perlambatan: makin tinggi persen, makin kecil penambahannya
+        let increment = 0;
+        if (fakeProgress < 30) increment = 5;       // 0-30%: Cepat
+        else if (fakeProgress < 60) increment = 2;  // 30-60%: Sedang
+        else if (fakeProgress < 85) increment = 0.5;// 60-85%: Pelan
+        else if (fakeProgress < 95) increment = 0.1;// 85-95%: Sangat pelan (Menunggu server)
+        
+        // Mentok di 95% sampai server beneran response
+        if (fakeProgress + increment < 95) {
+            fakeProgress += increment;
+        }
+
+        progressBar.style.width = fakeProgress + '%';
+        progressText.textContent = Math.round(fakeProgress) + '%';
+    }, 500); // Update tiap setengah detik
   }
 
-  window.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener("DOMContentLoaded", function () {
     selectTransactionSource('batch');
-    updateThresholdDisplay(70, 'nameDisplay', 'nameRecommendation');
-    updateThresholdDisplay(60, 'finalDisplay', 'finalRecommendation');
+    
+    const form = document.getElementById('bulkScreeningForm');
+    
+    form.addEventListener('submit', function(e) {
+      const source = document.getElementById('transactionSourceInput').value;
+      if (source === 'batch') return; 
+
+      e.preventDefault();
+
+      // UI Setup Phase 1 (Upload)
+      const progressContainer = document.getElementById('uploadProgressContainer');
+      const progressBar = document.getElementById('uploadProgressBar');
+      const progressText = document.getElementById('progressPercentText');
+      const submitBtn = document.getElementById('submitBtn');
+      const statusLabel = document.getElementById('progressStatusLabel');
+
+      progressContainer.style.display = 'block';
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = 'Mengupload File...';
+      
+      // Reset UI
+      progressBar.classList.remove('bg-success'); 
+      progressBar.classList.add('bg-primary');
+      statusLabel.textContent = 'Mengupload ke Server...';
+      statusLabel.classList.remove('text-success');
+
+      const formData = new FormData(form);
+      const xhr = new XMLHttpRequest();
+
+      // --- FASE 1: UPLOAD PROGRESS (REAL) ---
+      xhr.upload.addEventListener("progress", function(evt) {
+        if (evt.lengthComputable) {
+          const percentComplete = Math.round((evt.loaded / evt.total) * 100);
+          
+          // Selama upload, kita tampilkan progress real 0-100%
+          progressBar.style.width = percentComplete + '%';
+          progressText.textContent = percentComplete + '%';
+          
+          if (percentComplete >= 100) {
+             // Upload selesai, masuk ke FASE 2: DB Processing Simulation
+             startDBSimulation();
+          }
+        }
+      }, false);
+
+      // --- HANDLER SELESAI ---
+      xhr.addEventListener("load", function() {
+        clearInterval(simulationInterval); // Stop simulasi
+        
+        if (xhr.status >= 200 && xhr.status < 400) {
+            // Sukses! Penuhi bar jadi 100% sebelum redirect
+            progressBar.style.width = '100%';
+            progressText.textContent = '100%';
+            statusLabel.textContent = 'Selesai! Mengalihkan...';
+            
+            setTimeout(() => {
+                window.location.href = xhr.responseURL || "{{ url_for('web.screening_jobs') }}";
+            }, 500);
+        } else {
+            alert("Gagal memproses: " + xhr.statusText);
+            resetUI();
+        }
+      });
+
+      xhr.addEventListener("error", function() {
+        clearInterval(simulationInterval);
+        alert("Terjadi kesalahan jaringan.");
+        resetUI();
+      });
+
+      xhr.open("POST", form.action);
+      xhr.send(formData);
+
+      function resetUI() {
+        clearInterval(simulationInterval);
+        progressContainer.style.display = 'none';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Mulai Screening';
+        progressBar.style.width = '0%';
+      }
+    });
   });
 </script>
 {% endblock %}

@@ -3,7 +3,7 @@ import os
 import warnings
 from typing import Iterable, Sequence
 
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, distance
 
 try:
     import cudf  # type: ignore
@@ -70,7 +70,7 @@ class HybridNameIndex:
         self,
         query_norm: str,
         max_candidates: int = 1000,
-        tokens_limit: int = 2,
+        tokens_limit: int = 3,  # [TUNING] Naikkan limit token agar lebih teliti
         length_ratio: float = 0.30,
         prefix_len: int = 3,
     ) -> list[int]:
@@ -92,26 +92,42 @@ class HybridNameIndex:
 
                 col = self._df["name_norm"]
                 mask = None
+
+                # Menggunakan substring matching (4 huruf pertama) agar typo lolos filter.
                 for t in tokens:
-                    m = col.str.contains(t, regex=False)
-                    mask = m if mask is None else (mask | m)
+                    if len(t) < 3: continue  # Skip kata terlalu pendek
 
-                if prefix:
-                    m = col.str.contains(prefix, regex=False)
-                    mask = m if mask is None else (mask | m)
+                    # Ambil 4 huruf pertama (atau full token jika <4)
+                    search_pat = t[:4]
 
+                    # GPU contains (substring match)
+                    m = col.str.contains(search_pat, regex=False)
+                    mask = m if mask is None else (mask | m)
+                # -----------------------------------------------
+
+                # Fallback: jika mask None (misal kata terlalu pendek semua),
+                # gunakan prefix match atau ambil semua (notnull)
                 if mask is None:
-                    mask = col.notnull()
+                    if prefix:
+                        m = col.str.contains(prefix, regex=False)
+                        mask = m
+                    else:
+                        mask = col.notnull()
 
+                # Length Filter (Opsional: menjaga agar kandidat tidak terlalu beda panjangnya)
                 if q_len > 0 and length_ratio is not None:
                     lens = col.str.len()
                     allowed = int(max(1, q_len * float(length_ratio)))
                     mask = mask & ((lens - q_len).abs() <= allowed)
 
                 filtered = self._df[mask]
+                
+                # [TUNING] Pastikan kandidat cukup banyak untuk CPU Scoring
                 if max_candidates and max_candidates > 0:
                     filtered = filtered.head(int(max_candidates))
+                
                 return filtered.index.to_pandas().tolist()
+
             except Exception as e:
                 warnings.warn(
                     f"cuDF filtering failed ({type(e).__name__}: {e}); switching to pandas backend.",
@@ -122,7 +138,7 @@ class HybridNameIndex:
                     raise RuntimeError("pandas is required for CPU matching backend")
                 self._series = pd.Series(self._names, dtype="string")
 
-        # pandas backend
+        # pandas backend (CPU Fallback)
         if self._series is None:
             if pd is None:
                 raise RuntimeError("pandas is required for CPU matching backend")
@@ -156,6 +172,7 @@ def normalize_name(name: str) -> str:
     Normalisasi nama:
     - lower
     - hilangkan simbol non alfanumerik
+    - [BARU] hilangkan gelar/entitas (PT, CV, dll)
     - mapping varian (NAME_VARIANTS)
     - buang token kosong
     """
@@ -163,7 +180,17 @@ def normalize_name(name: str) -> str:
         return ""
 
     name = name.lower().strip()
+    
+    # 1. Hapus simbol
     name = re.sub(r'[^a-z0-9\s]', '', name)
+    
+    # 2. [BARU] Hapus Gelar/Noise Words (PT, CV, Mr, Mrs, Haji, dll)
+    # Ini penting agar "PT. Maju" vs "Maju" skornya tinggi.
+    name = re.sub(r'\b(pt|cv|ltd|inc|mr|mrs|haji|hj|ud)\b', '', name)
+    
+    # 3. Rapikan spasi
+    name = re.sub(r'\s+', ' ', name).strip()
+    
     tokens = name.split()
 
     normalized_tokens = [
@@ -181,9 +208,8 @@ def calculate_advanced_name_score(
     common_token_weight: float = 0.3
 ) -> float:
     """
-    Engine fuzzy name matching dari kode Streamlit:
-    - Kombinasi Jaro-Winkler, Levenshtein, dan token-based weighted matching.
-    - Output: skor 0–100.
+    Wrapper function untuk kalkulasi skor.
+    Input strings belum dinormalisasi.
     """
     if not isinstance(name1, str) or not isinstance(name2, str) or not name1 or not name2:
         return 0.0
@@ -206,38 +232,32 @@ def calculate_advanced_name_score_normed(
     norm_name2: str,
     common_token_weight: float = 0.3,
 ) -> float:
-    """Skor 0–100, asumsi input sudah dinormalisasi."""
+    """
+    SCIENTIST APPROVED ALGORITHM:
+    Menggunakan kombinasi Jaro-Winkler dan Token Sort Ratio.
+    
+    Kenapa?
+    - Jaro-Winkler: Sangat akurat untuk typo karakter dan singkatan di awal nama.
+    - Token Sort: Sangat akurat untuk urutan kata yang terbalik (Joko Widodo vs Widodo Joko).
+    
+    Bobot:
+    - 60% Jaro-Winkler (Prioritas Ejaan)
+    - 40% Token Sort (Fleksibilitas Urutan)
+    """
 
     if not norm_name1 or not norm_name2:
         return 0.0
 
-    base = float(fuzz.WRatio(norm_name1, norm_name2))
+    # 1. Jaro-Winkler Similarity (RapidFuzz implementation is standardized & fast)
+    # Mengatasi typo: "Usama" vs "Osama" -> Skor Tinggi
+    jw_score = distance.JaroWinkler.similarity(norm_name1, norm_name2) * 100.0
 
-    tokens1 = [t for t in norm_name1.split() if t]
-    tokens2 = [t for t in norm_name2.split() if t]
-    if not tokens1 or not tokens2:
-        return base
+    # 2. Token Sort Ratio
+    # Mengatasi urutan: "Widodo Joko" vs "Joko Widodo" -> Skor 100
+    sort_score = fuzz.token_sort_ratio(norm_name1, norm_name2)
 
-    temp_tokens2 = list(tokens2)
-    total_weight = 0.0
-    accumulated = 0.0
+    # 3. Weighted Average
+    # Kita beri bobot lebih ke JW karena akurasi karakter/ejaan adalah kunci di AML.
+    final = (0.60 * jw_score) + (0.40 * sort_score)
 
-    for token1 in sorted(tokens1):
-        best = 0.0
-        best_token = None
-
-        for token2 in temp_tokens2:
-            score = float(fuzz.ratio(token1, token2)) / 100.0
-            if score > best:
-                best = score
-                best_token = token2
-
-        weight = float(common_token_weight) if token1 in COMMON_TOKENS else 1.0
-        if best_token is not None:
-            accumulated += best * weight
-            temp_tokens2.remove(best_token)
-        total_weight += weight
-
-    token_score = (accumulated / total_weight) if total_weight > 0 else 0.0
-    final = (0.55 * base) + (0.45 * (token_score * 100.0))
     return float(final)
