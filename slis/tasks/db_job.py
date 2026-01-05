@@ -15,7 +15,7 @@ from slis.models import (
 from slis.matching.names import (
     normalize_name,
     calculate_advanced_name_score_normed,
-    HybridNameIndex,
+    HybridMatcher,
 )
 from slis.matching.geo import generate_geographic_insights
 from slis.matching.dob import calculate_dob_score_flexible
@@ -95,6 +95,7 @@ def run_screening_task(self, job_id: int) -> dict:
                 "id": s.id,
                 "source_id": s.source_id,
                 "snapshot_id": s.snapshot_id,
+                "primary_name": s.primary_name,
                 "name": s.primary_name,
                 "name_norm": norm_name,
                 "dob_raw": s.date_of_birth_raw,
@@ -103,7 +104,7 @@ def run_screening_task(self, job_id: int) -> dict:
                 "source_code": s.source.code if getattr(s, "source", None) else "UNKNOWN",
             })
 
-        sanction_index = HybridNameIndex([s["name_norm"] for s in sanction_rows])
+        matcher = HybridMatcher(sanction_rows, name_key="primary_name")
 
         # Update info job
         job.total_transactions = total_transactions
@@ -184,92 +185,94 @@ def run_screening_task(self, job_id: int) -> dict:
                     tx_dob_val = p["dob"]
                     tx_country_norm = normalize_country_code(p["country"])
 
-                    candidate_idxs = sanction_index.filter_indices(target_norm)
-                    for idx in candidate_idxs:
-                        s = sanction_rows[idx]
-                        # 1. Name Score
-                        name_score = calculate_advanced_name_score_normed(target_norm, s["name_norm"])
-                        if name_score < name_threshold: continue
+                    best = matcher.best_match_normed(target_norm, threshold=float(name_threshold))
+                    if not best:
+                        continue
 
-                        # 2. DOB Score Logic
-                        dob_score = 0.0
-                        has_dob = False
-                        dob_match_type = None
-                        
-                        # Hanya hitung jika kedua pihak punya data DOB
-                        if tx_dob_val and s["dob_raw"]:
-                            score, desc = calculate_dob_score_flexible(
-                                str(tx_dob_val), 
-                                str(s["dob_raw"]), 
-                                s["source_code"]
-                            )
-                            dob_score = float(score)
-                            dob_match_type = desc
-                            has_dob = True
+                    idx = int(best["index"])
+                    s = sanction_rows[idx]
+                    name_score = float(best["scores"]["final"])
 
-                        # 3. Citizenship Score Logic
-                        citizenship_score = 0.0
-                        has_cit = False
-                        matched_citizenship_val = None
-                        
-                        # Hanya hitung jika kedua pihak punya data Country
-                        if tx_country_norm and s["citizenship_norm"]:
-                            # Exact match pada kode negara yang sudah dinormalisasi (iso2/lower)
-                            if tx_country_norm == s["citizenship_norm"]:
-                                citizenship_score = 100.0
-                                matched_citizenship_val = s["citizenship"] # Simpan nilai asli
-                            has_cit = True
+                    # 2. DOB Score Logic
+                    dob_score = 0.0
+                    has_dob = False
+                    dob_match_type = None
 
-                        # 4. Final Score & Scheme Dynamic
-                        final_score = compute_final_score(
-                            name_score, dob_score, citizenship_score, has_dob, has_cit
+                    # Hanya hitung jika kedua pihak punya data DOB
+                    if tx_dob_val and s["dob_raw"]:
+                        score, desc = calculate_dob_score_flexible(
+                            str(tx_dob_val),
+                            str(s["dob_raw"]),
+                            s["source_code"],
                         )
-                        
-                        scheme_name = determine_scheme_name(has_dob, has_cit)
+                        dob_score = float(score)
+                        dob_match_type = desc
+                        has_dob = True
 
-                        if final_score < final_threshold: continue
+                    # 3. Citizenship Score Logic
+                    citizenship_score = 0.0
+                    has_cit = False
+                    matched_citizenship_val = None
 
-                        # 5. Geographic Insights
-                        customer_geo = {
-                            "Citizenship": p["country"], 
-                            "Country_of_Residence": tx.destination_country, 
-                            "Place_of_Birth": None
-                        }
-                        sanction_geo = { "Citizenship": s["citizenship"] }
-                        geo_insights = generate_geographic_insights(customer_geo, sanction_geo)
+                    # Hanya hitung jika kedua pihak punya data Country
+                    if tx_country_norm and s["citizenship_norm"]:
+                        # Exact match pada kode negara yang sudah dinormalisasi (iso2/lower)
+                        if tx_country_norm == s["citizenship_norm"]:
+                            citizenship_score = 100.0
+                            matched_citizenship_val = s["citizenship"]  # Simpan nilai asli
+                        has_cit = True
 
-                        total_matches += 1
-                        
-                        sr = ScreeningResult(
-                            job_id=job.id,
-                            transaction_id=tx.id,
-                            sanction_entity_id=s["id"],
-                            sanction_source_id=s["source_id"],
-                            sanction_snapshot_id=s["snapshot_id"],
-                            
-                            target_role=p["role"],
-                            target_name=raw_name,
-                            target_name_normalized=target_norm,
-                            target_country=tx.destination_country,
-                            
-                            sanction_name=s["name"],
-                            sanction_name_normalized=s["name_norm"],
-                            sanction_dob_raw=s["dob_raw"],
-                            sanction_citizenship=s["citizenship"],
-                            
-                            name_score=name_score,
-                            dob_score=dob_score,
-                            citizenship_score=citizenship_score,
-                            final_score=final_score,
-                            
-                            # Simpan metadata dinamis
-                            dob_match_type=dob_match_type,
-                            matched_dob_text=tx_dob_val if has_dob else None,
-                            matched_citizenship=matched_citizenship_val,
-                            weighting_scheme=scheme_name, # <--- INI SEKARANG DINAMIS
-                            geographic_insights=geo_insights
-                        )
-                        results_bulk.append(sr)
+                    # 4. Final Score & Scheme Dynamic
+                    final_score = compute_final_score(
+                        name_score, dob_score, citizenship_score, has_dob, has_cit
+                    )
+
+                    scheme_name = determine_scheme_name(has_dob, has_cit)
+
+                    if final_score < final_threshold:
+                        continue
+
+                    # 5. Geographic Insights
+                    customer_geo = {
+                        "Citizenship": p["country"],
+                        "Country_of_Residence": tx.destination_country,
+                        "Place_of_Birth": None,
+                    }
+                    sanction_geo = {"Citizenship": s["citizenship"]}
+                    geo_insights = generate_geographic_insights(customer_geo, sanction_geo)
+
+                    total_matches += 1
+
+                    sr = ScreeningResult(
+                        job_id=job.id,
+                        transaction_id=tx.id,
+                        sanction_entity_id=s["id"],
+                        sanction_source_id=s["source_id"],
+                        sanction_snapshot_id=s["snapshot_id"],
+
+                        target_role=p["role"],
+                        target_name=raw_name,
+                        target_name_normalized=target_norm,
+                        target_country=tx.destination_country,
+
+                        sanction_name=s["name"],
+                        sanction_name_normalized=s["name_norm"],
+                        sanction_dob_raw=s["dob_raw"],
+                        sanction_citizenship=s["citizenship"],
+
+                        name_score=name_score,
+                        dob_score=dob_score,
+                        citizenship_score=citizenship_score,
+                        final_score=final_score,
+
+                        # Simpan metadata dinamis
+                        dob_match_type=dob_match_type,
+                        matched_dob_text=tx_dob_val if has_dob else None,
+                        matched_citizenship=matched_citizenship_val,
+                        weighting_scheme=scheme_name,  # <--- INI SEKARANG DINAMIS
+                        geographic_insights=geo_insights,
+                    )
+                    results_bulk.append(sr)
 
                 # Update Progress ke Redis
                 if processed_count % update_frequency == 0 or processed_count == total_transactions:

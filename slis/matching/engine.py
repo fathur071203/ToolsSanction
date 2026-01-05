@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Tuple
 
-from .names import calculate_advanced_name_score_normed, normalize_name, HybridNameIndex
+from .names import HybridMatcher, calculate_advanced_name_score_normed, normalize_name
 from .dob import calculate_dob_score_flexible
 from .geo import generate_geographic_insights
 from .utils import normalize_and_compare
@@ -147,7 +147,6 @@ def run_screening_engine(
 
     # Precompute sanction payloads + GPU/CPU index once per call
     sanction_payloads: List[Dict[str, Any]] = []
-    sanction_name_norms: List[str] = []
     for sanc in sanctions:
         sanc_fields = _extract_sanction_fields(sanc)
         full_name = sanc_fields["full_name"]
@@ -157,15 +156,15 @@ def run_screening_engine(
         if not name_norm:
             continue
         payload = dict(sanc)
+        payload["primary_name"] = full_name
         payload["__slis_full_name"] = full_name
         payload["__slis_name_norm"] = name_norm
         payload["__slis_source_list"] = sanc_fields["source_list"]
         payload["__slis_date_of_birth"] = sanc_fields["date_of_birth"]
         payload["__slis_citizenship"] = sanc_fields["citizenship"]
         sanction_payloads.append(payload)
-        sanction_name_norms.append(name_norm)
 
-    sanction_index = HybridNameIndex(sanction_name_norms)
+    sanction_matcher = HybridMatcher(sanction_payloads, name_key="primary_name")
 
     for customer in customers:
         customer.setdefault("Country_of_Residence", customer.get("country_of_residence", ""))
@@ -183,14 +182,14 @@ def run_screening_engine(
         if not customer_norm:
             continue
 
-        candidate_idxs = sanction_index.filter_indices(customer_norm)
+        candidate_idxs = sanction_matcher.stage1_gpu_filter(customer_norm)
         for idx in candidate_idxs:
             sanc_payload = sanction_payloads[idx]
             source_list = sanc_payload["__slis_source_list"]
 
             name_score = calculate_advanced_name_score_normed(
                 customer_norm,
-                sanc_payload["__slis_name_norm"],
+                sanc_payload.get("__norm_name") or sanc_payload["__slis_name_norm"],
             )
 
             

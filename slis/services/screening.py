@@ -26,7 +26,7 @@ from slis.models import (
 
 from slis.matching.dob import calculate_dob_score_flexible
 from slis.matching.names import (
-    HybridNameIndex,
+    HybridMatcher,
     calculate_advanced_name_score_normed,
     normalize_name,
 )
@@ -137,13 +137,16 @@ def combine_scores(
 def _match_single_entity(
     query_data: Dict[str, Any], 
     sanction_data: Dict[str, Any], 
-    thresholds: Dict[str, float]
+    thresholds: Dict[str, float],
+    precomputed_name_score: float | None = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Helper function untuk membandingkan satu query dengan satu entitas sanksi.
     Menangani logika skor Nama, DOB, Citizenship, dan Geo Insights.
     """
-    name_score = compute_name_score(query_data["name_norm"], sanction_data["name_norm"])
+    name_score = float(precomputed_name_score) if precomputed_name_score is not None else compute_name_score(
+        query_data["name_norm"], sanction_data["name_norm"]
+    )
     if name_score < thresholds["name"]:
         return None
 
@@ -277,7 +280,7 @@ def run_screening_for_job(db, job_id: int) -> None:
 
         sanction_list_data = list(unique_sanction_map.values())
 
-        sanction_index = HybridNameIndex([s["name_norm"] for s in sanction_list_data])
+        matcher = HybridMatcher(sanction_list_data, name_key="primary_name")
         
         job.total_sanctions = len(sanction_list_data)
         db.add(job)
@@ -309,42 +312,56 @@ def run_screening_for_job(db, job_id: int) -> None:
             for tx in tx_chunk:
                 processed_count += 1
 
-            parties = [
-                ("sender", get_transaction_name(tx, "sender")),
-                ("receiver", get_transaction_name(tx, "receiver"))
-            ]
+                parties = [
+                    ("sender", get_transaction_name(tx, "sender")),
+                    ("receiver", get_transaction_name(tx, "receiver")),
+                ]
 
-            for role, party_name in parties:
-                if not party_name: continue
-                
-                query_data = {
-                    "name_norm": _normalize_name(party_name),
-                    "dob": None,
-                    "cit_raw": None,
-                    "cit_norm": None
-                }
+                for role, party_name in parties:
+                    if not party_name:
+                        continue
 
-                candidate_idxs = sanction_index.filter_indices(query_data["name_norm"])
+                    q_norm = _normalize_name(party_name)
+                    if not q_norm:
+                        continue
 
-                # Loop hanya ke data sanksi yang SUDAH UNIK
-                for idx in candidate_idxs:
+                    query_data = {
+                        "name_norm": q_norm,
+                        "dob": None,
+                        "cit_raw": None,
+                        "cit_norm": None,
+                    }
+
+                    best = matcher.best_match_normed(q_norm, threshold=float(thresholds["name"]))
+                    if not best:
+                        continue
+
+                    idx = int(best["index"])
                     s_data = sanction_list_data[idx]
-                    match = _match_single_entity(query_data, s_data, thresholds)
-                    if match:
-                        res = ScreeningResult(
-                            job_id=job.id,
-                            transaction_id=tx.id,
-                            sanction_entity_id=match["sanction_id"],
-                            sanction_source_id=s_data.get("source_id"),
-                            target_role=role,
-                            name_score=match["name_score"],
-                            dob_score=match["dob_score"],
-                            citizenship_score=match["citizenship_score"],
-                            final_score=match["final_score"],
-                            geographic_insights=match["geographic_insights"]
-                        )
-                        results_to_insert.append(res)
-                        total_matches += 1
+
+                    match = _match_single_entity(
+                        query_data,
+                        s_data,
+                        thresholds,
+                        precomputed_name_score=float(best["scores"]["final"]),
+                    )
+                    if not match:
+                        continue
+
+                    res = ScreeningResult(
+                        job_id=job.id,
+                        transaction_id=tx.id,
+                        sanction_entity_id=match["sanction_id"],
+                        sanction_source_id=s_data.get("source_id"),
+                        target_role=role,
+                        name_score=match["name_score"],
+                        dob_score=match["dob_score"],
+                        citizenship_score=match["citizenship_score"],
+                        final_score=match["final_score"],
+                        geographic_insights=match["geographic_insights"],
+                    )
+                    results_to_insert.append(res)
+                    total_matches += 1
 
             # Flush Batch Insert
             if len(results_to_insert) >= 1000:
@@ -422,7 +439,7 @@ def search_single_entity(
             
     sanction_list_data = list(unique_sanction_map.values())
 
-    sanction_index = HybridNameIndex([s["name_norm"] for s in sanction_list_data])
+    matcher = HybridMatcher(sanction_list_data, name_key="name")
 
     query_data = {
         "name_norm": _normalize_name(query_name),
@@ -434,7 +451,7 @@ def search_single_entity(
     thresholds = {"name": name_threshold, "final": final_threshold}
     matches = []
 
-    candidate_idxs = sanction_index.filter_indices(query_data["name_norm"])
+    candidate_idxs = matcher.stage1_gpu_filter(query_data["name_norm"])
     for idx in candidate_idxs:
         s_data = sanction_list_data[idx]
         match = _match_single_entity(query_data, s_data, thresholds)
@@ -470,7 +487,7 @@ def search_entities_bulk(
             
     sanction_list_data = list(unique_sanction_map.values())
 
-    sanction_index = HybridNameIndex([s["name_norm"] for s in sanction_list_data])
+    matcher = HybridMatcher(sanction_list_data, name_key="name")
 
     thresholds = {"name": name_threshold, "final": final_threshold}
     bulk_results = []
@@ -492,7 +509,7 @@ def search_entities_bulk(
         
         matches = []
 
-        candidate_idxs = sanction_index.filter_indices(query_data["name_norm"])
+        candidate_idxs = matcher.stage1_gpu_filter(query_data["name_norm"])
         for idx in candidate_idxs:
             s_data = sanction_list_data[idx]
             match = _match_single_entity(query_data, s_data, thresholds)
