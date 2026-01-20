@@ -1,6 +1,7 @@
 import re
 import os
 import warnings
+import logging
 from typing import Any, Sequence
 
 from rapidfuzz import fuzz, distance
@@ -16,6 +17,8 @@ except Exception:  # pragma: no cover
     pd = None
 
 NOISE_TITLES_RE = re.compile(r"\b(pt|cv|mr|mrs|haji|hj)\b", re.IGNORECASE)
+
+logger = logging.getLogger(__name__)
 
 
 class HybridNameIndex:
@@ -49,6 +52,7 @@ class HybridNameIndex:
                 # Force a tiny GPU interaction early so driver/runtime mismatch surfaces here.
                 _ = self._df["name_norm"].str.len().head(1).to_pandas()
                 self.backend = "cudf"
+                logger.info("Matcher backend: GPU (cuDF)")
                 return
             except Exception as e:
                 if selected == "cudf":
@@ -64,6 +68,7 @@ class HybridNameIndex:
         if pd is None:
             raise RuntimeError("pandas is required for CPU matching backend")
         self._series = pd.Series(self._names, dtype="string")
+        logger.info("Matcher backend: CPU (pandas)")
 
     def filter_indices(
         self,
@@ -211,8 +216,31 @@ class HybridMatcher:
 
         self.index = HybridNameIndex(self.sanction_norms)
 
+        # Optional performance tuning (keeps old behavior if env vars not set)
+        self._max_candidates = int(os.getenv("SLIS_MATCHER_MAX_CANDIDATES", "1000") or 1000)
+        self._tokens_limit = os.getenv("SLIS_MATCHER_TOKENS_LIMIT")
+        self._tokens_limit = int(self._tokens_limit) if self._tokens_limit and self._tokens_limit.isdigit() else None
+        self._length_ratio = os.getenv("SLIS_MATCHER_LENGTH_RATIO")
+        self._length_ratio = float(self._length_ratio) if self._length_ratio else None
+        self._prefix_len = int(os.getenv("SLIS_MATCHER_PREFIX_LEN", "0") or 0)
+
+        # Cache best-match computations (big win when names repeat).
+        try:
+            self._best_cache_max = int(os.getenv("SLIS_MATCHER_CACHE_SIZE", "50000"))
+        except Exception:
+            self._best_cache_max = 50000
+        if self._best_cache_max < 0:
+            self._best_cache_max = 0
+        self._best_cache: dict[tuple[str, float], dict[str, Any] | None] = {}
+
     def stage1_gpu_filter(self, query_norm: str) -> list[int]:
-        return self.index.filter_indices(query_norm)
+        return self.index.filter_indices(
+            query_norm,
+            max_candidates=self._max_candidates,
+            tokens_limit=self._tokens_limit,
+            length_ratio=self._length_ratio,
+            prefix_len=self._prefix_len,
+        )
 
     def stage2_cpu_scoring(self, query_norm: str, sanction_norm: str) -> dict[str, float]:
         jw_score = distance.JaroWinkler.similarity(query_norm, sanction_norm) * 100.0
@@ -227,6 +255,13 @@ class HybridMatcher:
     def best_match_normed(self, query_norm: str, threshold: float = 70.0) -> dict[str, Any] | None:
         if not query_norm:
             return None
+
+        cache_key = (query_norm, float(threshold))
+        if self._best_cache_max > 0:
+            cached = self._best_cache.get(cache_key, "__MISS__")
+            if cached != "__MISS__":
+                return cached
+
         candidate_indices = self.stage1_gpu_filter(query_norm)
         best_idx: int | None = None
         best_score = 0.0
@@ -241,12 +276,22 @@ class HybridMatcher:
                 best_scores = scores
 
         if best_idx is None or best_scores is None:
+            if self._best_cache_max > 0:
+                if len(self._best_cache) >= self._best_cache_max:
+                    self._best_cache.clear()
+                self._best_cache[cache_key] = None
             return None
 
-        return {
+        out = {
             "index": best_idx,
             "scores": best_scores,
         }
+
+        if self._best_cache_max > 0:
+            if len(self._best_cache) >= self._best_cache_max:
+                self._best_cache.clear()
+            self._best_cache[cache_key] = out
+        return out
 
 
 def calculate_advanced_name_score(

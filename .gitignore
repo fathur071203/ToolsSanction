@@ -25,6 +25,12 @@ uploads/
 !requirements.txt
 *.xlsx
 *.xls
+*.pdf
+
+data/private_uploads/
+data/ai_jobs/
+data/pycache/
+data/uploads/
 
 .vscode/
 .idea/

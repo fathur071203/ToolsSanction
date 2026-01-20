@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style>
+  .page-wrap { max-width: 1200px; margin: 0 auto; }
+  .page-title { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+  .page-title h1 { font-size: 1.6rem; font-weight: 700; margin: 0; }
+  .meta { color: var(--text-light); font-size: 0.9rem; }
+
+  .cardx { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .cardx h2 { font-size: 1.1rem; font-weight: 650; margin: 0 0 0.75rem; }
+
+  .small { font-size: 0.85rem; color: var(--text-secondary); }
+
+  .table-wrap { max-height: 520px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 0.7rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th { position: sticky; top: 0; background: var(--background); z-index: 1; }
+  .pill { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 999px; background: rgba(14,165,233,0.12); color: var(--primary-accent); font-weight: 600; font-size: 0.78rem; }
+  .source-head { display:flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.6rem; }
+  .source-head h2 { margin: 0; }
+  .actions-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+  .action-panel { border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem; background: rgba(0,0,0,0.02); margin-bottom: 0.75rem; }
+  .inline-edit { margin-top: 0.5rem; }
+  .inline-edit input { font-size: 0.95rem; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    // Toggle panels (replace dropdown-style <details>)
+    document.querySelectorAll('[data-toggle-panel]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sel = btn.getAttribute('data-toggle-panel');
+        if (!sel) return;
+        const panel = document.querySelector(sel);
+        if (!panel) return;
+        panel.classList.toggle('d-none');
+      });
+    });
+
+    // Toggle inline edit per row
+    document.querySelectorAll('[data-toggle-inline-edit]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sel = btn.getAttribute('data-toggle-inline-edit');
+        if (!sel) return;
+        const box = document.querySelector(sel);
+        if (!box) return;
+        box.classList.toggle('d-none');
+        const input = box.querySelector('input[name="new_name"]');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      });
+    });
+
+    const forms = document.querySelectorAll('form[data-ai-form]');
+    forms.forEach((form) => {
+      form.addEventListener('submit', () => {
+        const btn = form.querySelector('[data-ai-submit]');
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Memproses…';
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="page-title">
+    <div>
+      <h1>Sanctions</h1>
+      <div class="meta">
+        Sumber: <strong>{{ json_path }}</strong> · Total: <strong>{{ sanctions_count }}</strong>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-secondary" href="{{ url_for('web.sanctions_download') }}">Download JSON</a>
+      <a class="btn btn-secondary" href="{{ url_for('web.sanctions_upload') }}">Upload / Import</a>
+      <a class="btn btn-primary" href="{{ url_for('web.index') }}">Kembali</a>
+    </div>
+  </div>
+
+  <div class="cardx" style="margin-bottom: 1rem;">
+    <h2>Tambah Source</h2>
+    <p class="small">Tambahkan jenis/source sanctions baru. Source ini akan muncul sebagai grup walau belum ada record.</p>
+
+    <form method="post" class="row g-2 align-items-end">
+      <input type="hidden" name="action" value="add_source">
+      <div class="col-12 col-lg-6">
+        <label class="form-label mb-1">Source</label>
+        <input type="text" class="form-control" name="source" placeholder="Mis. DTTOT/NYDA RI KEPOLISIAN" required>
+      </div>
+      <div class="col-12 col-lg-2 d-grid">
+        <button type="submit" class="btn btn-success">Tambah Source</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="cardx" style="margin-bottom: 1rem;">
+    <h2>Cari Nama</h2>
+    <p class="small">Cari cepat berdasarkan nama (case-insensitive). Kosongkan untuk menampilkan semua.</p>
+
+    {% if q %}
+      <div class="small" style="margin-bottom: 0.5rem;">Menampilkan source yang punya hasil untuk: <strong>{{ q }}</strong></div>
+    {% endif %}
+
+    <form method="get" class="row g-2 align-items-end">
+      {% if dttot_token %}
+        <input type="hidden" name="dttot_token" value="{{ dttot_token }}">
+      {% endif %}
+
+      {% if active_source %}
+        <input type="hidden" name="source" value="{{ active_source }}">
+        <input type="hidden" name="per_page" value="{{ per_page }}">
+        <input type="hidden" name="page" value="1">
+        <input type="hidden" name="sort" value="{{ sort or 'order' }}">
+        <input type="hidden" name="dir" value="{{ sort_dir or 'asc' }}">
+      {% endif %}
+
+      <div class="col-12 col-lg-6">
+        <label class="form-label mb-1">Keyword</label>
+        <input type="text" class="form-control" name="q" value="{{ q or '' }}" placeholder="Mis. ahmad / putin / company">
+      </div>
+
+      <div class="col-12 col-lg-2 d-grid">
+        <button type="submit" class="btn btn-primary">Cari</button>
+      </div>
+
+      <div class="col-12 col-lg-2 d-grid">
+        {% if active_source %}
+          <a class="btn btn-secondary" href="{{ url_for('web.sanctions_manage', source=active_source, per_page=per_page, page=1, sort=sort, dir=sort_dir, dttot_token=dttot_token) }}">Reset</a>
+        {% else %}
+          <a class="btn btn-secondary" href="{{ url_for('web.sanctions_manage', dttot_token=dttot_token) }}">Reset</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  {% if active_source %}
+    {% set sid = active_source|replace(' ', '_')|replace('/', '_')|replace(':', '_') %}
+    <div class="cardx" style="margin-bottom: 1rem;">
+      <div class="source-head">
+        <div>
+          <h2><span class="pill">{{ active_source }}</span></h2>
+          {% if q and filtered_in_source is defined and total_in_source is defined and filtered_in_source != total_in_source %}
+            <div class="small">Hasil: <strong>{{ filtered_in_source }}</strong> / Total: <strong>{{ total_in_source }}</strong></div>
+          {% else %}
+            <div class="small">Total: <strong>{{ total_in_source }}</strong></div>
+          {% endif %}
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('web.sanctions_manage', q=q, dttot_token=dttot_token) }}">Kembali ke daftar source</a>
+        </div>
+      </div>
+
+      <div class="row g-2 align-items-end" style="margin-top: 0.25rem;">
+        <div class="col-12 col-lg-4">
+          <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="source" value="{{ active_source }}">
+            {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+            {% if dttot_token %}<input type="hidden" name="dttot_token" value="{{ dttot_token }}">{% endif %}
+            <input type="hidden" name="page" value="1">
+            <input type="hidden" name="sort" value="{{ sort or 'order' }}">
+            <input type="hidden" name="dir" value="{{ sort_dir or 'asc' }}">
+
+            <div class="col-12">
+              <label class="form-label mb-1">Tampilkan per halaman</label>
+              <select class="form-select" name="per_page" onchange="this.form.submit()">
+                {% for opt in per_page_options %}
+                  <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </form>
+        </div>
+
+        <div class="col-12 col-lg-8 d-flex justify-content-lg-end align-items-end">
+          <div class="btn-group" role="group" aria-label="Pagination">
+            {% set prev_page = 1 if page <= 1 else page - 1 %}
+            {% set next_page = total_pages if page >= total_pages else page + 1 %}
+            <a class="btn btn-outline-secondary btn-sm {% if page <= 1 %}disabled{% endif %}"
+               href="{{ url_for('web.sanctions_manage', source=active_source, q=q, dttot_token=dttot_token, per_page=per_page, page=prev_page, sort=sort, dir=sort_dir) }}">Prev</a>
+            <span class="btn btn-outline-secondary btn-sm disabled">Page {{ page }} / {{ total_pages }}</span>
+            <a class="btn btn-outline-secondary btn-sm {% if page >= total_pages %}disabled{% endif %}"
+               href="{{ url_for('web.sanctions_manage', source=active_source, q=q, dttot_token=dttot_token, per_page=per_page, page=next_page, sort=sort, dir=sort_dir) }}">Next</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions-row" style="margin-top: 0.75rem;">
+        {% if dttot_source and active_source == dttot_source %}
+          <button type="button" class="btn btn-outline-primary btn-sm" data-toggle-panel="#dttot-ai-{{ sid }}">AI DTTOT (PDF)</button>
+        {% endif %}
+        <button type="button" class="btn btn-outline-success btn-sm" data-toggle-panel="#add-{{ sid }}">Tambah Data</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle-panel="#upload-{{ sid }}">Upload Excel/CSV</button>
+      </div>
+
+      {% if dttot_source and active_source == dttot_source %}
+        <div class="action-panel d-none" id="dttot-ai-{{ sid }}">
+          <div class="small">
+            Alur: <strong>Upload PDF</strong> → <strong>AI normalisasi</strong> → <strong>Preview</strong> → <strong>Approve</strong> (baru masuk sanctions.json).
+          </div>
+
+          <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end" style="margin-top: 0.5rem;" data-ai-form>
+            <input type="hidden" name="action" value="dttot_ai_parse">
+            <input type="hidden" name="source" value="{{ dttot_source }}">
+
+            <div class="col-12 col-lg-6">
+              <label class="form-label mb-1">PDF DTTOT</label>
+              <input type="file" class="form-control" name="pdf" accept="application/pdf,.pdf" required>
+              <div class="small" style="margin-top: 0.25rem;">File harus PDF teks (bukan scan gambar).</div>
+            </div>
+
+            <div class="col-12 col-lg-2 d-grid">
+              <button type="submit" class="btn btn-primary" data-ai-submit>Proses AI</button>
+            </div>
+          </form>
+
+          {% if dttot_token and dttot_preview %}
+            <div class="small" style="margin-top: 0.75rem;">Preview hasil AI (token: <strong>{{ dttot_token }}</strong>)</div>
+            <div class="table-wrap" style="max-height: 280px; margin-top: 0.35rem;">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 16%">ID</th>
+                    <th style="width: 34%">Nama</th>
+                    <th style="width: 18%">DOB</th>
+                    <th style="width: 12%">CIT</th>
+                    <th>Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in dttot_preview[:200] %}
+                  <tr>
+                    <td class="small">{{ r.id or r.external_id or '-' }}</td>
+                    <td style="font-weight: 600">{{ r.name or '-' }}</td>
+                    <td class="small">{{ r.dob or '-' }}</td>
+                    <td class="small">{{ r.citizenship or '-' }}</td>
+                    <td class="small">{{ r.remarks or '-' }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <form method="post" class="row g-2 align-items-end" style="margin-top: 0.5rem;">
+              <input type="hidden" name="action" value="dttot_ai_approve">
+              <input type="hidden" name="token" value="{{ dttot_token }}">
+
+              <div class="col-12 col-lg-4">
+                <label class="form-label mb-1">Mode simpan</label>
+                <select class="form-select" name="mode">
+                  <option value="append" selected>Append (tambah ke data DTTOT)</option>
+                  <option value="replace_source">Replace Source (ganti semua data DTTOT)</option>
+                </select>
+              </div>
+
+              <div class="col-12 col-lg-3 d-grid">
+                <button type="submit" class="btn btn-success">Approve & Simpan</button>
+              </div>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="action-panel d-none" id="add-{{ sid }}">
+          <form method="post" class="row g-2 align-items-end">
+            <input type="hidden" name="action" value="add_record">
+            <input type="hidden" name="source" value="{{ active_source }}">
+
+            <div class="col-12 col-lg-5">
+              <label class="form-label mb-1">Nama</label>
+              <input type="text" class="form-control" name="name" placeholder="Nama individu/entitas" required>
+            </div>
+
+            <div class="col-12 col-lg-3">
+              <label class="form-label mb-1">ID (opsional)</label>
+              <input type="text" class="form-control" name="record_id" placeholder="Auto jika kosong">
+            </div>
+
+            <div class="col-6 col-lg-2">
+              <label class="form-label mb-1">DOB</label>
+              <input type="text" class="form-control" name="dob" placeholder="YYYY-MM-DD">
+            </div>
+
+            <div class="col-6 col-lg-2">
+              <label class="form-label mb-1">CIT</label>
+              <input type="text" class="form-control" name="citizenship" placeholder="ID/US">
+            </div>
+
+            <div class="col-12 col-lg-10">
+              <label class="form-label mb-1">Remarks (opsional)</label>
+              <input type="text" class="form-control" name="remarks" placeholder="Catatan singkat">
+            </div>
+
+            <div class="col-12 col-lg-2 d-grid">
+              <button type="submit" class="btn btn-success">Tambah</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="action-panel d-none" id="upload-{{ sid }}">
+          <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+            <input type="hidden" name="action" value="upload_source_file">
+            <input type="hidden" name="source" value="{{ active_source }}">
+
+            <div class="col-12 col-lg-5">
+              <label class="form-label mb-1">File</label>
+              <input type="file" class="form-control" name="file" accept=".csv,.json,application/json,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+              <div class="small" style="margin-top: 0.25rem;">
+                Format: <strong>CSV/XLSX</strong> (kolom minimal: <strong>name</strong>/<strong>full_name</strong>/<strong>nama</strong>) atau <strong>JSON</strong> (EU/NDJSON juga didukung)
+              </div>
+            </div>
+
+            <div class="col-12 col-lg-3">
+              <label class="form-label mb-1">Mode</label>
+              <select class="form-select" name="mode">
+                <option value="append" selected>Append (tambah)</option>
+                <option value="replace_source">Replace Source (ganti isi source ini)</option>
+              </select>
+            </div>
+
+            <div class="col-12 col-lg-2 d-grid">
+              <button type="submit" class="btn btn-secondary">Upload</button>
+            </div>
+          </form>
+        </div>
+
+        {% if source_records and source_records|length > 0 %}
+        <div class="table-wrap" style="margin-top: 0.75rem;">
+          <table>
+            <thead>
+              {% set _curr_sort = sort or 'order' %}
+              {% set _curr_dir = sort_dir or 'asc' %}
+              {% set _next_dir = 'desc' if _curr_dir == 'asc' else 'asc' %}
+              {% set _arrow_up = '↑' %}
+              {% set _arrow_dn = '↓' %}
+              <tr>
+                <th style="width: 28%;">
+                  <a href="{{ url_for('web.sanctions_manage', source=active_source, q=q, dttot_token=dttot_token, per_page=per_page, page=1, sort='name', dir=_next_dir if _curr_sort=='name' else 'asc') }}" style="text-decoration:none; color:inherit;">
+                    Nama {% if _curr_sort=='name' %}{{ _arrow_up if _curr_dir=='asc' else _arrow_dn }}{% endif %}
+                  </a>
+                </th>
+                <th style="width: 18%;">
+                  <a href="{{ url_for('web.sanctions_manage', source=active_source, q=q, dttot_token=dttot_token, per_page=per_page, page=1, sort='id', dir=_next_dir if _curr_sort=='id' else 'asc') }}" style="text-decoration:none; color:inherit;">
+                    ID {% if _curr_sort=='id' %}{{ _arrow_up if _curr_dir=='asc' else _arrow_dn }}{% endif %}
+                  </a>
+                </th>
+                <th style="width: 14%;">
+                  <a href="{{ url_for('web.sanctions_manage', source=active_source, q=q, dttot_token=dttot_token, per_page=per_page, page=1, sort='dob', dir=_next_dir if _curr_sort=='dob' else 'asc') }}" style="text-decoration:none; color:inherit;">
+                    DOB {% if _curr_sort=='dob' %}{{ _arrow_up if _curr_dir=='asc' else _arrow_dn }}{% endif %}
+                  </a>
+                </th>
+                <th style="width: 12%;">
+                  <a href="{{ url_for('web.sanctions_manage', source=active_source, q=q, dttot_token=dttot_token, per_page=per_page, page=1, sort='citizenship', dir=_next_dir if _curr_sort=='citizenship' else 'asc') }}" style="text-decoration:none; color:inherit;">
+                    Citizenship {% if _curr_sort=='citizenship' %}{{ _arrow_up if _curr_dir=='asc' else _arrow_dn }}{% endif %}
+                  </a>
+                </th>
+                <th>
+                  <a href="{{ url_for('web.sanctions_manage', source=active_source, q=q, dttot_token=dttot_token, per_page=per_page, page=1, sort='remarks', dir=_next_dir if _curr_sort=='remarks' else 'asc') }}" style="text-decoration:none; color:inherit;">
+                    Remarks {% if _curr_sort=='remarks' %}{{ _arrow_up if _curr_dir=='asc' else _arrow_dn }}{% endif %}
+                  </a>
+                </th>
+                <th style="width: 10%;">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in source_records %}
+              <tr>
+                <td>
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+                    <div style="font-weight: 600;">{{ s.name }}</div>
+                  </div>
+
+                  {% if s.id %}
+                  <div class="inline-edit d-none" id="edit-{{ sid }}-{{ loop.index }}">
+                    <form method="post" class="row g-2 align-items-end" style="margin-top: 0.25rem;">
+                      <input type="hidden" name="action" value="update_record_name">
+                      <input type="hidden" name="source" value="{{ active_source }}">
+                      <input type="hidden" name="record_id" value="{{ s.id }}">
+
+                      <div class="col-12 col-lg-8">
+                        <input type="text" class="form-control" name="new_name" value="{{ s.name }}" required>
+                      </div>
+                      <div class="col-12 col-lg-4 d-grid">
+                        <button type="submit" class="btn btn-success">Simpan</button>
+                      </div>
+                    </form>
+                  </div>
+                  {% endif %}
+                </td>
+                <td class="small">{{ s.id }}</td>
+                <td class="small">{{ s.dob or '-' }}</td>
+                <td class="small">{{ s.citizenship or '-' }}</td>
+                <td class="small">{{ s.remarks or '-' }}</td>
+                <td>
+                  {% if s.id %}
+                    <div class="d-flex gap-2" style="flex-wrap:wrap;">
+                      <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle-inline-edit="#edit-{{ sid }}-{{ loop.index }}">Edit</button>
+                      <form method="post" style="display:inline;" onsubmit="return confirm('Hapus record ini?');">
+                        <input type="hidden" name="action" value="delete_record">
+                        <input type="hidden" name="source" value="{{ active_source }}">
+                        <input type="hidden" name="record_id" value="{{ s.id }}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Hapus</button>
+                      </form>
+                    </div>
+                  {% else %}
+                    <span class="small">-</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <div class="small" style="margin-top: 0.75rem;">Tidak ada data untuk source ini{% if q %} (filter: <strong>{{ q }}</strong>){% endif %}.</div>
+        {% endif %}
+      </div>
+
+  {% else %}
+    {% if sources_summary and sources_summary|length > 0 %}
+      <div class="cardx" style="margin-bottom: 1rem;">
+        <h2>Daftar Source</h2>
+        <p class="small">Klik salah satu source untuk melihat datanya per halaman (pagination).</p>
+
+        <div class="table-wrap" style="max-height: 420px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th style="width: 16%;">Total</th>
+                {% if q %}<th style="width: 16%;">Hasil</th>{% endif %}
+                <th style="width: 18%;">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in sources_summary %}
+                <tr>
+                  <td><span class="pill">{{ s.source }}</span></td>
+                  <td class="small">{{ s.total_count }}</td>
+                  {% if q %}<td class="small">{{ s.shown_count }}</td>{% endif %}
+                  <td>
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('web.sanctions_manage', source=s.source, q=q, dttot_token=dttot_token, per_page=50, page=1) }}">Buka</a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% else %}
+      <div class="cardx">
+        <h2>Data kosong</h2>
+        <p class="small">Belum ada data sanctions pada <strong>{{ json_path }}</strong>.</p>
+        <a class="btn btn-secondary" href="{{ url_for('web.sanctions_upload') }}">Upload / Import</a>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -90,12 +90,10 @@
               {{ j.total_matches or 0 }}
             </td>
             <td class="small text-muted">
-              {{ j.started_at.strftime('%Y-%m-%d %H:%M') if j.started_at else
-              '-' }}
+              {{ j.started_at|wib_fmt('%Y-%m-%d %H:%M') if j.started_at else '-' }}
             </td>
             <td class="small text-muted">
-              {{ j.finished_at.strftime('%Y-%m-%d %H:%M') if j.finished_at else
-              '-' }}
+              {{ j.finished_at|wib_fmt('%Y-%m-%d %H:%M') if j.finished_at else '-' }}
             </td>
             <td>
               {% if is_success %}

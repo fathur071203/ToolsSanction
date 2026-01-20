@@ -2,7 +2,7 @@
 
 {% block head %}
 <style>
-  /* Premium screening results with horizontal card navigation */
+  /* Screening results */
   .result-header {
     margin-bottom: 2rem;
   }
@@ -46,89 +46,80 @@
     color: var(--danger);
   }
 
-  /* Added horizontal scrollable transaction cards */
   .results-container { margin-top: 2rem; }
   .results-header { margin-bottom: 1.5rem; }
   .results-header h2 { margin: 0; font-size: 1.3rem; font-weight: 600; color: var(--text-primary); }
   .results-info { color: var(--text-secondary); margin-top: 0.5rem; font-size: 0.95rem; }
-  
-  /* Horizontal scrollable transaction cards */
-  .transaction-cards-container {
-    overflow-x: auto;
-    white-space: nowrap;
-    padding: 1rem 0;
-    margin-bottom: 2rem;
-    display: flex;
-    gap: 1rem;
-    scrollbar-width: thin;
-    scrollbar-color: var(--primary-accent) var(--background);
-  }
-  .transaction-cards-container::-webkit-scrollbar {
-    height: 8px;
-  }
-  .transaction-cards-container::-webkit-scrollbar-track {
-    background: var(--background);
-    border-radius: 4px;
-  }
-  .transaction-cards-container::-webkit-scrollbar-thumb {
-    background: var(--primary-accent);
-    border-radius: 4px;
-  }
-  
-  .transaction-card {
-    min-width: 300px;
-    flex-shrink: 0;
+
+  /* Vertical, insight-focused grouping */
+  .tx-block {
     background-color: var(--surface);
-    border: 2px solid var(--border);
+    border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 1.25rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    white-space: normal;
-  }
-  .transaction-card:hover {
-    border-color: var(--primary-accent);
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
-    transform: translateY(-2px);
-  }
-  .transaction-card.active {
-    border-color: var(--primary-accent);
-    background-color: rgba(14, 165, 233, 0.05);
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
-  }
-  .transaction-card-id {
-    font-size: 0.8rem;
-    color: var(--text-light);
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-  }
-  .transaction-card-names {
-    font-size: 0.95rem;
-    color: var(--text-primary);
-    margin-bottom: 0.75rem;
-  }
-  .transaction-card-name {
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
+    margin-bottom: 1.25rem;
     overflow: hidden;
   }
-  .transaction-card-label {
-    font-size: 0.75rem;
+  .tx-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(14, 165, 233, 0.02);
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .tx-title {
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .tx-names {
     color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+  .tx-label {
+    font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    color: var(--text-light);
+    margin-right: 0.35rem;
   }
-  .transaction-card-matches {
-    display: inline-block;
-    background-color: rgba(239, 68, 68, 0.1);
-    color: var(--danger);
-    padding: 0.35rem 0.75rem;
-    border-radius: 20px;
+  .target-block {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+  .target-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+  .target-name {
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-left: 0.5rem;
+  }
+  .target-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+  .target-sources {
+    margin-bottom: 0.75rem;
+  }
+
+  details.score-details {
+    margin-top: 0.5rem;
+  }
+  details.score-details summary {
+    cursor: pointer;
+    color: var(--primary-accent);
+    text-decoration: underline;
     font-size: 0.85rem;
-    font-weight: 600;
   }
 
   /* Simplified table with only name_score and final_score */
@@ -238,6 +229,23 @@
     color: var(--text-primary);
   }
 
+  .source-badge {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(14, 165, 233, 0.08);
+    color: var(--primary-accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 0.35rem;
+    margin-top: 0.25rem;
+  }
+
+  .source-badge.secondary {
+    background: rgba(100, 116, 139, 0.12);
+    color: var(--text-secondary);
+  }
+
   .entity-meta {
     font-size: 0.85rem;
     color: var(--text-light);
@@ -275,10 +283,6 @@
       grid-template-columns: 1fr 1fr;
     }
 
-    .transaction-card {
-      min-width: 250px;
-    }
-
     .results-table {
       font-size: 0.8rem;
     }
@@ -300,6 +304,11 @@
 {% endblock %}
 
 {% block content %}
+{% macro score_class(score) -%}
+  {%- set s = score or 0 -%}
+  {%- if s >= 70 -%}score-high{%- elif s >= 40 -%}score-medium{%- else -%}score-low{%- endif -%}
+{%- endmacro %}
+
 <div class="result-header">
   <h1>Hasil Screening – Job #{{ job.id }}</h1>
   <p style="color: var(--text-secondary); margin: 0;">
@@ -307,6 +316,21 @@
     <span class="badge bg-{{ 'success' if job.status == 'SUCCESS' else ('danger' if job.status == 'FAILURE' else 'warning') }}">
       {{ job.status }}
     </span>
+  </p>
+  <p style="color: var(--text-secondary); margin: 0.25rem 0 0;">
+    User: <strong>{{ job.created_by or (batch.created_by if batch else None) or '-' }}</strong>
+    {% if category_code or category_label or category_desc %}
+      • Kategori:
+      {% if category_code %}
+        <strong>{{ category_code }}</strong>
+      {% endif %}
+      {% if category_desc %}
+        <span style="margin-left:0.35rem;">- {{ category_desc }}</span>
+      {% endif %}
+      {% if category_label %}
+        <span style="margin-left:0.35rem;">(ditandai dari <strong>{{ category_label }}</strong>)</span>
+      {% endif %}
+    {% endif %}
   </p>
 </div>
 
@@ -317,12 +341,12 @@
     <div class="summary-value">{{ job.total_transactions }}</div>
   </div>
   <div class="summary-card">
-    <div class="summary-label">Entitas Sanksi</div>
-    <div class="summary-value">{{ job.total_sanctions }}</div>
+    <div class="summary-label">Entitas Sanksi (Terdeteksi)</div>
+    <div class="summary-value">{{ kpi_sanctions_detected if kpi_sanctions_detected is not none else (job.total_sanctions or 0) }}</div>
   </div>
   <div class="summary-card">
     <div class="summary-label">Matches Ditemukan</div>
-    <div class="summary-value danger">{{ job.total_matches or 0 }}</div>
+    <div class="summary-value danger">{{ kpi_total_matches if kpi_total_matches is not none else (job.total_matches or 0) }}</div>
   </div>
   <div class="summary-card">
     <div class="summary-label">Threshold Final</div>
@@ -330,34 +354,238 @@
   </div>
 </div>
 
-{% if results and results|length > 0 %}
-  <div class="results-container">
-    <div class="results-header">
-      <h2>Transaksi dengan Matches</h2>
-      <div class="results-info">
-        <span id="resultsInfo">Ditemukan <strong>{{ results|length }}</strong> matches di transaksi</span>
+<div class="results-container">
+  <div class="results-header">
+    <h2>Ringkasan Matches</h2>
+    <div class="results-info">
+      Filter final score ≥ <strong>{{ '%.1f'|format(min_score or 0) }}%</strong>
+      {% if reporter_code_selected and reporter_code_selected != 'ALL' %}
+        • SANDI_PELAPOR: <strong>{{ reporter_code_selected }}</strong>
+      {% endif %}
+      {% if sanction_source_selected and sanction_source_selected != 'ALL' %}
+        • Sumber sanction: <strong>{{ sanction_source_selected }}</strong>
+      {% endif %}
+      • Ditemukan <strong>{{ total_tx_with_matches or 0 }}</strong> transaksi.
+      {% if (total_tx_with_matches or 0) > 0 %}
+        <span style="margin-left: 0.5rem;">Menampilkan transaksi <strong>{{ page_start }}</strong>–<strong>{{ page_end }}</strong> dari <strong>{{ total_tx_with_matches }}</strong></span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+    <form method="get" style="display:flex; align-items:center; gap:0.75rem; margin:0; flex-wrap: wrap;">
+      <input type="hidden" name="page" value="1">
+
+        <label for="min_score" style="color: var(--text-secondary); font-size: 0.9rem;">Threshold</label>
+        <input
+          id="min_score"
+          name="min_score"
+          type="number"
+          min="0"
+          max="100"
+          step="1"
+          value="{{ (min_score or 0)|round(0, 'floor') }}"
+          class="form-control"
+          style="width: 110px;"
+        />
+
+        <label for="per_page" style="color: var(--text-secondary); font-size: 0.9rem;">Per halaman</label>
+        <select id="per_page" name="per_page" class="form-select" style="width: auto;" onchange="this.form.submit()">
+          {% for opt in per_page_options or [5,10,20,50] %}
+            <option value="{{ opt }}" {% if opt == per_page %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+
+        <label for="reporter_code" style="color: var(--text-secondary); font-size: 0.9rem;">SANDI_PELAPOR</label>
+        <select id="reporter_code" name="reporter_code" class="form-select" style="width: auto;" onchange="this.form.submit()">
+          <option value="ALL" {% if (reporter_code_selected or 'ALL') == 'ALL' %}selected{% endif %}>ALL</option>
+          {% for r in reporter_options or [] %}
+            <option value="{{ r.code }}" {% if r.code == reporter_code_selected %}selected{% endif %}>{{ r.label }}</option>
+          {% endfor %}
+        </select>
+
+        <label for="sanction_source" style="color: var(--text-secondary); font-size: 0.9rem;">Sumber Sanction</label>
+        <select id="sanction_source" name="sanction_source" class="form-select" style="width: auto;" onchange="this.form.submit()">
+          <option value="ALL" {% if (sanction_source_selected or 'ALL') == 'ALL' %}selected{% endif %}>ALL</option>
+          {% for s in sanction_source_options or [] %}
+            <option value="{{ s.code }}" {% if s.code == sanction_source_selected %}selected{% endif %}>{{ s.label }}</option>
+          {% endfor %}
+        </select>
+        <noscript>
+          <button class="btn btn-outline-primary" type="submit">Terapkan</button>
+        </noscript>
+
+        <button class="btn btn-outline-primary" type="submit">Terapkan</button>
+      </form>
+
+      {% if total_pages and total_pages > 1 and (total_tx_with_matches or 0) > 0 %}
+        <nav aria-label="Pagination" style="display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap;">
+          {% set prev_page = page - 1 %}
+          {% set next_page = page + 1 %}
+
+          <a class="btn btn-outline-primary" {% if page <= 1 %}aria-disabled="true" style="pointer-events:none; opacity:0.6;"{% else %}href="{{ url_for('web.screening_job_detail', job_id=job.id, page=prev_page, per_page=per_page, min_score=min_score, reporter_code=reporter_code_selected, sanction_source=sanction_source_selected) }}"{% endif %}>
+            ← Prev
+          </a>
+
+          {% set start_p = 1 if page - 2 < 1 else page - 2 %}
+          {% set end_p = total_pages if page + 2 > total_pages else page + 2 %}
+
+          {% if start_p > 1 %}
+            <a class="btn btn-outline-primary" href="{{ url_for('web.screening_job_detail', job_id=job.id, page=1, per_page=per_page, min_score=min_score, reporter_code=reporter_code_selected, sanction_source=sanction_source_selected) }}">1</a>
+            {% if start_p > 2 %}
+              <span style="color: var(--text-light); padding: 0 0.25rem;">…</span>
+            {% endif %}
+          {% endif %}
+
+          {% for p in range(start_p, end_p + 1) %}
+            {% if p == page %}
+              <span class="btn btn-primary" style="pointer-events:none;">{{ p }}</span>
+            {% else %}
+              <a class="btn btn-outline-primary" href="{{ url_for('web.screening_job_detail', job_id=job.id, page=p, per_page=per_page, min_score=min_score, reporter_code=reporter_code_selected, sanction_source=sanction_source_selected) }}">{{ p }}</a>
+            {% endif %}
+          {% endfor %}
+
+          {% if end_p < total_pages %}
+            {% if end_p < total_pages - 1 %}
+              <span style="color: var(--text-light); padding: 0 0.25rem;">…</span>
+            {% endif %}
+            <a class="btn btn-outline-primary" href="{{ url_for('web.screening_job_detail', job_id=job.id, page=total_pages, per_page=per_page, min_score=min_score, reporter_code=reporter_code_selected, sanction_source=sanction_source_selected) }}">{{ total_pages }}</a>
+          {% endif %}
+
+          <a class="btn btn-outline-primary" {% if page >= total_pages %}aria-disabled="true" style="pointer-events:none; opacity:0.6;"{% else %}href="{{ url_for('web.screening_job_detail', job_id=job.id, page=next_page, per_page=per_page, min_score=min_score, reporter_code=reporter_code_selected, sanction_source=sanction_source_selected) }}"{% endif %}>
+            Next →
+          </a>
+        </nav>
+      {% endif %}
+  </div>
+
+  {% if tx_groups and tx_groups|length > 0 %}
+    {% for tx in tx_groups %}
+      <div class="tx-block">
+        <div class="tx-header">
+          <div class="tx-title">TX #{{ tx.transaction_id }}</div>
+          <div class="tx-names">
+            <div><span class="tx-label">Sender</span>{{ tx.sender_name }}</div>
+            <div><span class="tx-label">Receiver</span>{{ tx.receiver_name }}</div>
+            {% if tx.reporter_code %}
+              <div><span class="tx-label">SANDI_PELAPOR</span>{{ tx.reporter_code }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        {% for t in tx.targets %}
+          <div class="target-block">
+            <div class="target-header">
+              <div>
+                <span class="badge bg-secondary">{{ t.target_role }}</span>
+                <span class="target-name">{{ t.target_name }}</span>
+              </div>
+              <div class="target-summary">
+                <span>{{ t.match_count }} matches</span>
+                <span>
+                  Max
+                  <span class="score-badge {{ score_class(t.max_final_score) }}">{{ '%.1f'|format(t.max_final_score or 0) }}%</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="target-sources">
+              <span class="tx-label">Sumber sanction</span>
+              {% if t.sources and t.sources|length > 0 %}
+                {% for s in t.sources %}
+                  <span class="source-badge">{{ s }}</span>
+                {% endfor %}
+              {% else %}
+                <span class="source-badge secondary">UNKNOWN</span>
+              {% endif %}
+            </div>
+
+            <div class="table-wrapper">
+              <table class="results-table">
+                <thead>
+                  <tr>
+                    <th>Referensi Nama (Sanction)</th>
+                    <th>Sumber List</th>
+                    <th>Skor Nama</th>
+                    <th>Skor Akhir</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for m in t.matches %}
+                    <tr class="match-row-highlight">
+                      <td>
+                        <div class="entity-name">{{ m.sanction_name or '-' }}</div>
+                        <div class="entity-meta">Target: {{ m.target_name or t.target_name }}</div>
+                      </td>
+                      <td>
+                        <span class="source-badge">{{ m.sanction_source_code or 'UNKNOWN' }}</span>
+                      </td>
+                      <td>
+                        <span class="score-badge {{ score_class(m.name_score) }}">{{ '%.1f'|format(m.name_score or 0) }}%</span>
+                      </td>
+                      <td>
+                        <span class="score-badge {{ score_class(m.final_score) }}"><strong>{{ '%.1f'|format(m.final_score or 0) }}%</strong></span>
+                        <details class="score-details">
+                          <summary>Detail</summary>
+                          <div class="score-breakdown">
+                            <div class="score-breakdown-item">
+                              <span>Skor Nama:</span>
+                              <strong>{{ '%.1f'|format(m.name_score or 0) }}%</strong>
+                            </div>
+                            <div class="score-breakdown-item">
+                              <span>Skor DOB:</span>
+                              <strong>{{ '%.1f'|format(m.dob_score or 0) }}%</strong>
+                            </div>
+                            <div class="score-breakdown-item">
+                              <span>Skor Citizenship:</span>
+                              <strong>{{ '%.1f'|format(m.citizenship_score or 0) }}%</strong>
+                            </div>
+                            <div class="score-breakdown-item" style="border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.5rem;">
+                              <span><strong>Skor Akhir:</strong></span>
+                              <strong style="color: var(--danger);">{{ '%.1f'|format(m.final_score or 0) }}%</strong>
+                            </div>
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+
+    {% if total_pages and total_pages > 1 %}
+      <div style="display:flex; justify-content: flex-end; margin-top: 1rem;">
+        <nav aria-label="Pagination" style="display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap;">
+          <a class="btn btn-outline-primary" {% if page <= 1 %}aria-disabled="true" style="pointer-events:none; opacity:0.6;"{% else %}href="{{ url_for('web.screening_job_detail', job_id=job.id, page=page-1, per_page=per_page, min_score=min_score, reporter_code=reporter_code_selected, sanction_source=sanction_source_selected) }}"{% endif %}>
+            ← Prev
+          </a>
+          <span style="color: var(--text-secondary); font-size: 0.9rem;">Halaman {{ page }} / {{ total_pages }}</span>
+          <a class="btn btn-outline-primary" {% if page >= total_pages %}aria-disabled="true" style="pointer-events:none; opacity:0.6;"{% else %}href="{{ url_for('web.screening_job_detail', job_id=job.id, page=page+1, per_page=per_page, min_score=min_score, reporter_code=reporter_code_selected, sanction_source=sanction_source_selected) }}"{% endif %}>
+            Next →
+          </a>
+        </nav>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="results-section">
+      <div class="empty-results">
+        <div class="empty-results-icon">✓</div>
+        <h3 style="color: var(--text-secondary); margin-bottom: 0.5rem;">Tidak ada matches</h3>
+        {% if reporter_code_selected and reporter_code_selected != 'ALL' %}
+          <p>Tidak ada hasil match untuk <strong>SANDI_PELAPOR {{ reporter_code_selected }}</strong> pada threshold saat ini.</p>
+        {% elif sanction_source_selected and sanction_source_selected != 'ALL' %}
+          <p>Tidak ada hasil match untuk <strong>Sumber sanction {{ sanction_source_selected }}</strong> pada threshold saat ini.</p>
+        {% else %}
+          <p>Tidak ada hasil match pada threshold saat ini.</p>
+        {% endif %}
       </div>
     </div>
-
-    <!-- Horizontal scrollable transaction cards -->
-    <div class="transaction-cards-container" id="transactionCardsContainer">
-      <!-- Cards will be generated by JavaScript -->
-    </div>
-
-    <!-- Table for selected transaction's matches -->
-    <div class="results-section" id="resultsTableContainer">
-      <!-- Table will be generated by JavaScript -->
-    </div>
-  </div>
-{% else %}
-  <div class="results-section">
-    <div class="empty-results">
-      <div class="empty-results-icon">✓</div>
-      <h3 style="color: var(--text-secondary); margin-bottom: 0.5rem;">Tidak ada matches</h3>
-      <p>Semua transaksi di batch ini lolos screening tanpa menemukan kecocokan dengan sanction list.</p>
-    </div>
-  </div>
-{% endif %}
+  {% endif %}
+</div>
 
 <!-- Action Buttons -->
 <div class="action-buttons">
@@ -365,168 +593,4 @@
   <a href="{{ url_for('web.index') }}" class="btn btn-secondary">Kembali ke Dashboard</a>
   <button class="btn btn-primary" disabled style="opacity: 0.6;">Export Hasil (Coming Soon)</button>
 </div>
-
-<script id="results-data" type="application/json">
-  {{ results|tojson|safe }}
-</script>
-
-<script>
-  
-  const rawResultsData = document.getElementById('results-data').textContent;
-  let rawResults = [];
-  try {
-    rawResults = JSON.parse(rawResultsData) || [];
-  } catch (e) {
-    console.error("Gagal parsing JSON data:", e);
-  }
-
-  const transactionGroups = {};
-  rawResults.forEach(result => {
-    const txId = result.transaction_id;
-    if (!transactionGroups[txId]) {
-      transactionGroups[txId] = {
-        transaction_id: txId,
-        sender_name: result.sender_name,
-        receiver_name: result.receiver_name,
-        matches: []
-      };
-    }
-    transactionGroups[txId].matches.push(result);
-  });
-
-  const transactions = Object.values(transactionGroups);
-  let selectedTransactionIndex = 0;
-
-  function initializeResults() {
-    if (transactions.length === 0) return;
-
-    const cardsContainer = document.getElementById('transactionCardsContainer');
-    cardsContainer.innerHTML = '';
-
-    // Generate cards for each transaction with matches
-    transactions.forEach((tx, index) => {
-      const card = document.createElement('div');
-      card.className = `transaction-card ${index === 0 ? 'active' : ''}`;
-      card.onclick = () => selectTransaction(index);
-      
-      card.innerHTML = `
-        <div class="transaction-card-id">TX #${tx.transaction_id}</div>
-        <div class="transaction-card-names">
-          <div class="transaction-card-label">Sender</div>
-          <div class="transaction-card-name">${tx.sender_name || 'N/A'}</div>
-          <div class="transaction-card-label" style="margin-top: 0.5rem;">Receiver</div>
-          <div class="transaction-card-name">${tx.receiver_name || 'N/A'}</div>
-        </div>
-        <div class="transaction-card-matches">${tx.matches.length} matches</div>
-      `;
-      
-      cardsContainer.appendChild(card);
-    });
-
-    // Display first transaction's matches
-    displayMatchesForTransaction(0);
-  }
-
-  function selectTransaction(index) {
-    selectedTransactionIndex = index;
-    
-    // Update active state on cards
-    const cards = document.querySelectorAll('.transaction-card');
-    cards.forEach((card, i) => {
-      card.classList.toggle('active', i === index);
-    });
-
-    // Display matches for selected transaction
-    displayMatchesForTransaction(index);
-  }
-
-  function displayMatchesForTransaction(index) {
-    const tx = transactions[index];
-    const tableContainer = document.getElementById('resultsTableContainer');
-    
-    let tableHTML = `
-      <div class="table-wrapper">
-        <table class="results-table">
-          <thead>
-            <tr>
-              <th>Nama (Sanksi)</th>
-              <th>Role</th>
-              <th>Skor Nama</th>
-              <th>Skor Akhir</th>
-            </tr>
-          </thead>
-          <tbody>
-    `;
-
-    tx.matches.forEach((match, matchIndex) => {
-      const uniqueId = `match-${index}-${matchIndex}`;
-      const nameScoreClass = getScoreClass(match.name_score);
-      const finalScoreClass = getScoreClass(match.final_score);
-      
-      tableHTML += `
-        <tr class="match-row-highlight">
-          <td>
-            <div class="entity-name">${match.sanction_name || 'N/A'}</div>
-          </td>
-          <td>
-            <span class="badge bg-secondary">${match.target_role || 'N/A'}</span>
-          </td>
-          <td>
-            <span class="score-badge ${nameScoreClass}">${(match.name_score || 0).toFixed(1)}%</span>
-          </td>
-          <td class="score-cell">
-            <span class="score-badge ${finalScoreClass}"><strong>${(match.final_score || 0).toFixed(1)}%</strong></span>
-            <button class="score-breakdown-toggle" onclick="toggleScoreBreakdown('${uniqueId}')">Lihat Detail</button>
-            <div id="breakdown-${uniqueId}" class="score-breakdown" style="display: none;">
-              <div class="score-breakdown-item">
-                <span>Skor Nama:</span>
-                <strong>${(match.name_score || 0).toFixed(1)}%</strong>
-              </div>
-              <div class="score-breakdown-item">
-                <span>Skor DOB:</span>
-                <strong>${(match.dob_score || 0).toFixed(1)}%</strong>
-              </div>
-              <div class="score-breakdown-item">
-                <span>Skor Citizenship:</span>
-                <strong>${(match.citizenship_score || 0).toFixed(1)}%</strong>
-              </div>
-              <div class="score-breakdown-item" style="border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.5rem;">
-                <span><strong>Skor Akhir:</strong></span>
-                <strong style="color: var(--danger);">${(match.final_score || 0).toFixed(1)}%</strong>
-              </div>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-
-    tableHTML += `
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    tableContainer.innerHTML = tableHTML;
-  }
-
-  function toggleScoreBreakdown(uniqueId) {
-    const breakdown = document.getElementById(`breakdown-${uniqueId}`);
-    if (breakdown.style.display === 'none') {
-      breakdown.style.display = 'block';
-    } else {
-      breakdown.style.display = 'none';
-    }
-  }
-
-  function getScoreClass(score) {
-    if (score >= 70) return 'score-high';
-    if (score >= 40) return 'score-medium';
-    return 'score-low';
-  }
-
-  // Initialize on page load
-  if (transactions.length > 0) {
-    initializeResults();
-  }
-</script>
 {% endblock %}

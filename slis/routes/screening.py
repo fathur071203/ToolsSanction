@@ -5,11 +5,26 @@ from celery.result import AsyncResult
 from slis.db import SessionLocal
 from slis.models import ScreeningJob, UploadBatch
 from slis.celery_app import celery_app
+from slis.celery_utils import enqueue_screening_job
 
 from slis.services.screening import search_entities_bulk
+from slis.services.screening import run_screening_for_job
 
 
 screening_bp = Blueprint("screening", __name__)
+
+
+def _start_screening_in_background(job_id: int) -> None:
+    import threading
+
+    def _runner() -> None:
+        db = SessionLocal()
+        try:
+            run_screening_for_job(db=db, job_id=job_id)
+        finally:
+            db.close()
+
+    threading.Thread(target=_runner, name=f"slis-screening-{job_id}", daemon=True).start()
 
 @screening_bp.route("/jobs", methods=["POST"])
 def create_screening_job():
@@ -30,6 +45,11 @@ def create_screening_job():
             status="PENDING",
             threshold_name_score=data.get("threshold_name_score", 70.0),
             threshold_score=data.get("threshold_score", 60.0),
+            sanction_source_filter=(
+                None
+                if str(data.get("sanction_source", "") or "").strip().upper() in {"", "ALL"}
+                else str(data.get("sanction_source") or "").strip()
+            ),
             created_at=datetime.now(timezone.utc),
             created_by=data.get("created_by"),
         )
@@ -37,20 +57,19 @@ def create_screening_job():
         db.commit()
         db.refresh(job)
 
-        # Kirim ke Celery
-        async_result = celery_app.send_task(
-            "slis.run_screening_task",
-            args=[job.id],
-        )
-
-        # Persist task id for progress/cancel while still PENDING
-        job.celery_task_id = async_result.id
-        db.commit()
+        celery_task_id = enqueue_screening_job(job.id)
+        if celery_task_id:
+            job.celery_task_id = celery_task_id
+            db.commit()
+        else:
+            job.celery_task_id = None
+            db.commit()
+            _start_screening_in_background(job.id)
 
         return jsonify(
             {
                 "job_id": job.id,
-                "celery_task_id": async_result.id,
+                "celery_task_id": celery_task_id,
                 "status": job.status,
             }
         )
@@ -132,25 +151,23 @@ def get_screening_progress(job_id: int):
             "finished_at": job.finished_at.isoformat() if job.finished_at else None,
         }
 
-        # Pas job RUNNING, ambil data Real-time dari Redis
+        # Optional: enrich from Celery backend if available, but never break if Redis is down.
         if job.status == "RUNNING" and job.celery_task_id:
-            # AsyncResult un5uk mengambil meta dari Redis
-            task = celery_app.AsyncResult(job.celery_task_id)
-
-            print(f"FLASK DEBUG: Job {job_id} | State: {task.state} | Info: {task.info}")
-            
-            if isinstance(task.info, dict) and 'percent' in task.info:
-                data = task.info
-                response["status"] = "RUNNING"
-                response["processed"] = data.get('current', job.processed_transactions)
-                response["total"] = data.get('total', job.total_transactions)
-                response["percent"] = data.get('percent', job.progress_percentage)
-                response["matches"] = data.get('matches', job.total_matches)
-            
-            elif task.state == 'SUCCESS':
-                response["status"] = "SUCCESS"
-                response["percent"] = 100
-                response["processed"] = job.total_transactions
+            try:
+                task = celery_app.AsyncResult(job.celery_task_id)
+                if isinstance(task.info, dict) and "percent" in task.info:
+                    data = task.info
+                    response["processed"] = data.get("current", response["processed"])
+                    response["total"] = data.get("total", response["total"])
+                    response["percent"] = data.get("percent", response["percent"])
+                    response["matches"] = data.get("matches", response["matches"])
+                elif task.state == "SUCCESS":
+                    response["status"] = "SUCCESS"
+                    response["percent"] = 100
+                    response["processed"] = job.total_transactions
+            except Exception:
+                # Keep DB-backed progress.
+                pass
 
         return jsonify(response)
 
@@ -166,6 +183,10 @@ def quick_search_bulk():
     threshold = float(data.get("threshold", 60.0))
     limit = int(data.get("limit", 10))
 
+    sanction_sources = data.get("sanction_sources")
+    if sanction_sources is None:
+        sanction_sources = data.get("sanction_source")
+
     if not queries:
         return jsonify({"error": "Queries list cannot be empty"}), 400
 
@@ -176,7 +197,8 @@ def quick_search_bulk():
             queries=queries,
             limit=limit,
             name_threshold=threshold - 10,
-            final_threshold=threshold
+            final_threshold=threshold,
+            sanction_sources=sanction_sources,
         )
         
         return jsonify({

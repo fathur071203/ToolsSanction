@@ -316,6 +316,7 @@
     border-radius: 5px;
     outline: none;
     -webkit-appearance: none;
+    appearance: none;
   }
 
   .form-range::-webkit-slider-thumb {
@@ -387,12 +388,23 @@
           <select name="batch_id" id="batchIdSelect" class="form-select">
             <option value="">-- Pilih batch transaksi --</option>
             {% for b in batches %}
-              <option value="{{ b.id }}">
-                #{{ b.id }} — {{ b.filename }} ({{ b.row_count }} baris, {{ b.created_at }})
+              <option value="{{ b.id }}"
+                      data-download-url="{{ url_for('web.transaction_batch_download', batch_id=b.id) }}"
+                      data-reimport-url="{{ url_for('web.transaction_batch_reimport', batch_id=b.id) }}">
+                #{{ b.id }} — {{ b.filename }} ({{ b.row_count }} baris, {{ b.created_at|wib_fmt('%Y-%m-%d %H:%M') }})
               </option>
             {% endfor %}
           </select>
           <div class="form-text">Pilih batch transaksi yang ingin di-screening</div>
+
+          <div class="d-flex gap-2" style="margin-top: 0.75rem; flex-wrap: wrap;">
+            <a id="batchDownloadLink" class="btn btn-outline-secondary btn-sm disabled" href="#" tabindex="-1">Download File Batch</a>
+
+            <form id="batchReimportForm" method="post" action="#" style="display: inline;">
+              <input type="hidden" name="created_by" value="">
+              <button type="submit" class="btn btn-outline-primary btn-sm" disabled onclick="return confirm('Re-import akan membuat batch baru dari file yang tersimpan. Lanjutkan?');">Re-import (buat batch baru)</button>
+            </form>
+          </div>
         </div>
       </div>
 
@@ -416,7 +428,7 @@
         <label class="form-label">Ambang Batas Skor Nama</label>
         <div class="threshold-group">
           <div class="threshold-input-row">
-            <input type="range" name="threshold_name_score" id="nameScoreSlider" class="form-range" value="70" min="0" max="100" 
+            <input type="range" name="threshold_name_score" id="nameScoreSlider" class="form-range" value="70" min="0" max="100" step="1"
                    oninput="updateThresholdDisplay(this.value, 'nameDisplay', 'nameRecommendation')">
             <div class="threshold-value-display" id="nameDisplay">70%</div>
           </div>
@@ -433,7 +445,7 @@
         <label class="form-label">Ambang Batas Skor Akhir</label>
         <div class="threshold-group">
           <div class="threshold-input-row">
-            <input type="range" name="threshold_score" id="finalScoreSlider" class="form-range" value="60" min="0" max="100" 
+            <input type="range" name="threshold_score" id="finalScoreSlider" class="form-range" value="60" min="0" max="100" step="1"
                    oninput="updateThresholdDisplay(this.value, 'finalDisplay', 'finalRecommendation')">
             <div class="threshold-value-display" id="finalDisplay">60%</div>
           </div>
@@ -451,8 +463,19 @@
           Nama Petugas
           <span class="label-optional">(Opsional)</span>
         </label>
-        <input type="text" name="created_by" class="form-control" placeholder="Nama petugas yang menjalankan screening">
+        <input type="text" id="createdByInput" name="created_by" class="form-control" placeholder="Nama petugas yang menjalankan screening">
         <div class="form-text">Untuk audit trail dan pencatatan petugas</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Sanction List</label>
+        <select name="sanction_source" id="sanctionSourceSelect" class="form-control">
+          <option value="ALL">ALL</option>
+          {% for s in match_sanction_sources or [] %}
+            <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Pilih source sanction yang dipakai untuk matching (opsional).</div>
       </div>
 
       <div class="info-box" style="margin-top: 1.5rem;">
@@ -484,7 +507,7 @@
       
       <div class="form-actions">
         <a href="{{ url_for('web.index') }}" class="btn btn-cancel">Batal</a>
-        <button type="submit" class="btn btn-primary" id="submitBtn">Mulai Screening</button>
+        <button type="button" class="btn btn-primary" id="submitBtn">Mulai Screening</button>
       </div>
     </form>
   </div>
@@ -492,6 +515,26 @@
 
 <script>
   let simulationInterval;
+  let uploadedBatchId = null;
+  const uploadOnlyUrl = "{{ url_for('web.transaction_batch_upload') }}";
+
+  function updateThresholdDisplay(value, displayId, recId) {
+    const v = Math.max(0, Math.min(100, Number(value || 0)));
+    const display = document.getElementById(displayId);
+    if (display) display.textContent = `${Math.round(v)}%`;
+
+    const rec = document.getElementById(recId);
+    if (!rec) return;
+
+    let text = 'Threshold moderat untuk screening balanced';
+    if (v < 40) text = 'Sangat rendah: hasil match akan banyak (noise tinggi)';
+    else if (v < 60) text = 'Rendah: lebih sensitif, potensi false positive lebih tinggi';
+    else if (v < 80) text = 'Moderat: rekomendasi untuk penggunaan umum';
+    else if (v < 90) text = 'Tinggi: lebih ketat, match lebih sedikit namun lebih akurat';
+    else text = 'Sangat tinggi: sangat ketat, berisiko banyak miss';
+
+    rec.innerHTML = `<strong>Rekomendasi:</strong> ${text}`;
+  }
 
   function selectTransactionSource(source) {
     document.getElementById('sourceBatch').classList.remove('active');
@@ -504,21 +547,236 @@
       document.getElementById('transactionUploadSection').style.display = 'none';
       document.getElementById('batchIdSelect').setAttribute('required', 'required');
       document.getElementById('transactionFileInput').removeAttribute('required');
+
+      const submitBtn = document.getElementById('submitBtn');
+      if (submitBtn) submitBtn.innerHTML = 'Mulai Screening';
     } else {
       document.getElementById('sourceTransactionUpload').classList.add('active');
       document.getElementById('batchSelectSection').style.display = 'none';
       document.getElementById('transactionUploadSection').style.display = 'block';
       document.getElementById('batchIdSelect').removeAttribute('required');
       document.getElementById('transactionFileInput').setAttribute('required', 'required');
+
+      const submitBtn = document.getElementById('submitBtn');
+      if (submitBtn) submitBtn.innerHTML = 'Upload File';
     }
   }
+
+  function updateBatchActions() {
+    const sel = document.getElementById('batchIdSelect');
+    const link = document.getElementById('batchDownloadLink');
+    const form = document.getElementById('batchReimportForm');
+    if (!sel || !link || !form) return;
+
+    const opt = sel.options[sel.selectedIndex];
+    const downloadUrl = opt ? opt.getAttribute('data-download-url') : '';
+    const reimportUrl = opt ? opt.getAttribute('data-reimport-url') : '';
+
+    const btn = form.querySelector('button[type="submit"]');
+    const createdByInput = document.getElementById('createdByInput');
+    const createdByVal = createdByInput ? (createdByInput.value || '') : '';
+    const formCreatedBy = form.querySelector('input[name="created_by"]');
+    if (formCreatedBy) formCreatedBy.value = createdByVal;
+
+    if (downloadUrl) {
+      link.href = downloadUrl;
+      link.classList.remove('disabled');
+      link.removeAttribute('tabindex');
+    } else {
+      link.href = '#';
+      link.classList.add('disabled');
+      link.setAttribute('tabindex', '-1');
+    }
+
+    if (reimportUrl) {
+      form.action = reimportUrl;
+      if (btn) btn.disabled = false;
+    } else {
+      form.action = '#';
+      if (btn) btn.disabled = true;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const sel = document.getElementById('batchIdSelect');
+    if (sel) {
+      sel.addEventListener('change', updateBatchActions);
+      updateBatchActions();
+    }
+    const createdBy = document.getElementById('createdByInput');
+    if (createdBy) createdBy.addEventListener('input', updateBatchActions);
+  });
 
   function updateFileName(input, displayId) {
     const fileNameDisplay = document.getElementById(displayId);
     if (input.files && input.files[0]) {
       fileNameDisplay.textContent = '✓ ' + input.files[0].name + ' (' + (input.files[0].size / 1024 / 1024).toFixed(2) + ' MB)';
       fileNameDisplay.style.color = 'var(--success)';
+
+      // Show a clear status immediately after choosing a file.
+      const progressContainer = document.getElementById('uploadProgressContainer');
+      const progressBar = document.getElementById('uploadProgressBar');
+      const progressText = document.getElementById('progressPercentText');
+      const statusLabel = document.getElementById('progressStatusLabel');
+      if (progressContainer && progressBar && progressText && statusLabel) {
+        progressContainer.style.display = 'block';
+        progressBar.classList.remove('bg-success');
+        progressBar.classList.add('bg-primary');
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+        statusLabel.textContent = 'File dipilih. Klik "Upload File" untuk mulai upload...';
+        statusLabel.classList.remove('text-success');
+      }
     }
+  }
+
+  function startUploadOnly() {
+    // UI Setup Phase 1 (Upload)
+    const progressContainer = document.getElementById('uploadProgressContainer');
+    const progressBar = document.getElementById('uploadProgressBar');
+    const progressText = document.getElementById('progressPercentText');
+    const submitBtn = document.getElementById('submitBtn');
+    const statusLabel = document.getElementById('progressStatusLabel');
+    const fileInput = document.getElementById('transactionFileInput');
+
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+      alert('Pilih file transaksi terlebih dahulu.');
+      return;
+    }
+
+    if (progressContainer) progressContainer.style.display = 'block';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = 'Mengupload File...';
+    }
+
+    // Reset UI
+    if (progressBar) {
+      progressBar.classList.remove('bg-success');
+      progressBar.classList.add('bg-primary');
+    }
+    if (statusLabel) {
+      statusLabel.textContent = 'Mengupload ke Server...';
+      statusLabel.classList.remove('text-success');
+    }
+
+    // Upload-only payload
+    const formData = new FormData();
+    formData.append('transaction_file', fileInput.files[0]);
+    const createdByInput = document.getElementById('createdByInput');
+    if (createdByInput && createdByInput.value) formData.append('created_by', createdByInput.value);
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', function(evt) {
+      if (!evt.lengthComputable) return;
+      const percentComplete = Math.round((evt.loaded / evt.total) * 100);
+
+      const loadedMb = (evt.loaded / 1024 / 1024).toFixed(2);
+      const totalMb = (evt.total / 1024 / 1024).toFixed(2);
+      if (statusLabel) statusLabel.textContent = `Mengupload ke Server... (${loadedMb} / ${totalMb} MB)`;
+
+      if (progressBar) progressBar.style.width = percentComplete + '%';
+      if (progressText) progressText.textContent = percentComplete + '%';
+
+      if (percentComplete >= 100) {
+        startDBSimulation();
+      }
+    }, false);
+
+    xhr.addEventListener('load', function() {
+      clearInterval(simulationInterval);
+
+      if (xhr.status >= 200 && xhr.status < 400) {
+        if (progressBar) {
+          progressBar.style.width = '100%';
+          progressBar.classList.remove('bg-primary');
+          progressBar.classList.add('bg-success');
+        }
+        if (progressText) progressText.textContent = '100%';
+
+        let resp = null;
+        try { resp = JSON.parse(xhr.responseText || '{}'); } catch (e) { resp = null; }
+        const newBatchId = resp && resp.batch_id ? String(resp.batch_id) : null;
+        if (!newBatchId) {
+          alert('Upload berhasil, tapi respon batch_id tidak ditemukan.');
+          resetUploadUI();
+          return;
+        }
+
+        uploadedBatchId = newBatchId;
+        if (statusLabel) statusLabel.textContent = `Upload selesai. Batch #${newBatchId} siap diproses. Klik "Mulai Screening" untuk menjalankan.`;
+
+        // Ensure dropdown has the new batch option and is selected
+        const batchSelect = document.getElementById('batchIdSelect');
+        if (batchSelect) {
+          let opt = batchSelect.querySelector(`option[value="${newBatchId}"]`);
+          if (!opt) {
+            opt = document.createElement('option');
+            opt.value = newBatchId;
+            opt.textContent = `#${newBatchId} — ${(resp.filename || 'Upload Baru')} (${resp.row_count || 0} baris)`;
+            opt.setAttribute('data-download-url', resp.download_url || `/transactions/batches/${newBatchId}/download`);
+            opt.setAttribute('data-reimport-url', resp.reimport_url || `/transactions/batches/${newBatchId}/reimport`);
+            batchSelect.insertBefore(opt, batchSelect.options[1] || null);
+          }
+          batchSelect.value = newBatchId;
+        }
+
+        // Switch to batch mode for the next step
+        document.getElementById('transactionSourceInput').value = 'batch';
+        selectTransactionSource('batch');
+        updateBatchActions();
+
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = 'Mulai Screening';
+        }
+      } else {
+        alert('Gagal upload/proses: ' + (xhr.statusText || ('HTTP ' + xhr.status)));
+        resetUploadUI();
+      }
+    });
+
+    xhr.addEventListener('error', function() {
+      clearInterval(simulationInterval);
+      alert('Terjadi kesalahan jaringan.');
+      resetUploadUI();
+    });
+
+    xhr.open('POST', uploadOnlyUrl);
+    xhr.send(formData);
+
+    function resetUploadUI() {
+      clearInterval(simulationInterval);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Upload File';
+      }
+      if (progressBar) progressBar.style.width = '0%';
+      if (progressText) progressText.textContent = '0%';
+    }
+  }
+
+  function startScreeningSubmit() {
+    const form = document.getElementById('bulkScreeningForm');
+    const batchSelect = document.getElementById('batchIdSelect');
+    const sourceInput = document.getElementById('transactionSourceInput');
+
+    if (!form || !batchSelect || !sourceInput) return;
+
+    // If user uploaded but dropdown wasn't set (defensive), set it.
+    if ((!batchSelect.value || batchSelect.value === '') && uploadedBatchId) {
+      batchSelect.value = String(uploadedBatchId);
+    }
+
+    if (!batchSelect.value) {
+      alert('Pilih batch transaksi terlebih dahulu.');
+      return;
+    }
+
+    sourceInput.value = 'batch';
+    // Submit normal POST to /screening/start
+    form.submit();
   }
 
   // --- FUNGSI SIMULASI PROGRESS DB ---
@@ -562,88 +820,26 @@
     }, 500); // Update tiap setengah detik
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
+  document.addEventListener('DOMContentLoaded', function () {
     selectTransactionSource('batch');
-    
-    const form = document.getElementById('bulkScreeningForm');
-    
-    form.addEventListener('submit', function(e) {
+
+    // Initialize threshold displays (in case browser doesn't fire oninput yet)
+    const nameSlider = document.getElementById('nameScoreSlider');
+    if (nameSlider) updateThresholdDisplay(nameSlider.value, 'nameDisplay', 'nameRecommendation');
+    const finalSlider = document.getElementById('finalScoreSlider');
+    if (finalSlider) updateThresholdDisplay(finalSlider.value, 'finalDisplay', 'finalRecommendation');
+
+    const submitBtn = document.getElementById('submitBtn');
+    if (!submitBtn) return;
+
+    submitBtn.addEventListener('click', function() {
       const source = document.getElementById('transactionSourceInput').value;
-      if (source === 'batch') return; 
-
-      e.preventDefault();
-
-      // UI Setup Phase 1 (Upload)
-      const progressContainer = document.getElementById('uploadProgressContainer');
-      const progressBar = document.getElementById('uploadProgressBar');
-      const progressText = document.getElementById('progressPercentText');
-      const submitBtn = document.getElementById('submitBtn');
-      const statusLabel = document.getElementById('progressStatusLabel');
-
-      progressContainer.style.display = 'block';
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = 'Mengupload File...';
-      
-      // Reset UI
-      progressBar.classList.remove('bg-success'); 
-      progressBar.classList.add('bg-primary');
-      statusLabel.textContent = 'Mengupload ke Server...';
-      statusLabel.classList.remove('text-success');
-
-      const formData = new FormData(form);
-      const xhr = new XMLHttpRequest();
-
-      // --- FASE 1: UPLOAD PROGRESS (REAL) ---
-      xhr.upload.addEventListener("progress", function(evt) {
-        if (evt.lengthComputable) {
-          const percentComplete = Math.round((evt.loaded / evt.total) * 100);
-          
-          // Selama upload, kita tampilkan progress real 0-100%
-          progressBar.style.width = percentComplete + '%';
-          progressText.textContent = percentComplete + '%';
-          
-          if (percentComplete >= 100) {
-             // Upload selesai, masuk ke FASE 2: DB Processing Simulation
-             startDBSimulation();
-          }
-        }
-      }, false);
-
-      // --- HANDLER SELESAI ---
-      xhr.addEventListener("load", function() {
-        clearInterval(simulationInterval); // Stop simulasi
-        
-        if (xhr.status >= 200 && xhr.status < 400) {
-            // Sukses! Penuhi bar jadi 100% sebelum redirect
-            progressBar.style.width = '100%';
-            progressText.textContent = '100%';
-            statusLabel.textContent = 'Selesai! Mengalihkan...';
-            
-            setTimeout(() => {
-                window.location.href = xhr.responseURL || "{{ url_for('web.screening_jobs') }}";
-            }, 500);
-        } else {
-            alert("Gagal memproses: " + xhr.statusText);
-            resetUI();
-        }
-      });
-
-      xhr.addEventListener("error", function() {
-        clearInterval(simulationInterval);
-        alert("Terjadi kesalahan jaringan.");
-        resetUI();
-      });
-
-      xhr.open("POST", form.action);
-      xhr.send(formData);
-
-      function resetUI() {
-        clearInterval(simulationInterval);
-        progressContainer.style.display = 'none';
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = 'Mulai Screening';
-        progressBar.style.width = '0%';
+      if (source === 'upload') {
+        startUploadOnly();
+        return;
       }
+      // batch mode
+      startScreeningSubmit();
     });
   });
 </script>

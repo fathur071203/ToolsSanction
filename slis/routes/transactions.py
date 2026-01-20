@@ -42,10 +42,7 @@ def upload_transaction_txt():
                 "batch_id": batch.id,
                 "filename": batch.filename,
                 "row_count": batch.row_count,
-                "status": batch.status,
-                "form_no": batch.form_no,
-                "form_period_raw": batch.form_period_raw,
-                "reporter_code": batch.reporter_code,
+                "source_type": batch.source_type,
                 "sample_transactions": sample_rows,
             }
         )

@@ -148,10 +148,7 @@ class SanctionEntity(Base):
         back_populates="entity",
         cascade=CASCADE_ALL_DELETE_ORPHAN,
     )
-    screening_results: Mapped[list["ScreeningResult"]] = relationship(
-        "ScreeningResult",
-        back_populates="sanction_entity",
-    )
+    # ScreeningResult is no longer FK-linked to sanction_entity (sanctions now sourced from JSON).
 
 
 class SanctionAlias(Base):
@@ -263,6 +260,10 @@ class ScreeningJob(Base):
     threshold_name_score = Column(Float, default=70.0)
     threshold_score = Column(Float, default=60.0)
 
+    # Optional filter: restrict matching to specific sanction source code(s).
+    # Stored as comma-separated codes, e.g. "OFAC" or "OFAC,UN". Null/empty means ALL.
+    sanction_source_filter = Column(Text, nullable=True)
+
     total_transactions = Column(Integer, default=0)
     processed_transactions = Column(Integer, default=0)
     total_sanctions = Column(Integer, default=0)
@@ -292,7 +293,13 @@ class ScreeningResult(Base):
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("screening_job.id"), nullable=False)
     transaction_id = Column(Integer, ForeignKey("transactions.id"), nullable=False)
-    sanction_entity_id = Column(Integer, ForeignKey("sanction_entity.id"), nullable=False)
+    # NOTE: sanctions are now sourced from JSON, not DB.
+    # Keep this nullable and without FK so results can be stored without sanction_entity rows.
+    sanction_entity_id = Column(Integer, nullable=True)
+
+    # Stable identifier from JSON (string-friendly), plus human-readable source code.
+    sanction_external_id = Column(String(255), nullable=True)
+    sanction_source_code = Column(String(50), nullable=True)
 
     sanction_source_id = Column(Integer, nullable=True)
     sanction_snapshot_id = Column(Integer, nullable=True)
@@ -331,9 +338,5 @@ class ScreeningResult(Base):
     )
     transaction = relationship(
         "Transaction",
-        back_populates="screening_results",
-    )
-    sanction_entity = relationship(
-        "SanctionEntity",
         back_populates="screening_results",
     )

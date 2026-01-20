@@ -17,12 +17,9 @@ DEV_MAX_TRANSACTIONS = int(os.getenv("SLIS_DEV_MAX_TRANSACTIONS", "20"))
 DEV_MAX_SANCTIONS = int(os.getenv("SLIS_DEV_MAX_SANCTIONS", "200"))
 
 
-from slis.models import (
-    ScreeningJob,
-    ScreeningResult,
-    Transaction,
-    SanctionEntity,
-)
+from slis.models import ScreeningJob, ScreeningResult, Transaction
+
+from slis.sanctions_json import sanctions_for_matcher
 
 from slis.matching.dob import calculate_dob_score_flexible
 from slis.matching.names import (
@@ -88,18 +85,8 @@ def get_transaction_name(tx: Transaction, role: str = "sender") -> str:
     return ""
 
 
-def get_sanction_name(s: SanctionEntity) -> str:
-    """
-    Ambil nama sanksi dari berbagai kemungkinan field.
-    """
-    candidates = [
-        getattr(s, "primary_name", None),
-        getattr(s, "full_name", None),
-        getattr(s, "name", None),
-    ]
-    for val in candidates:
-        if val:
-            return str(val)
+def get_sanction_name(_s) -> str:
+    # Legacy helper kept for compatibility; sanctions are now loaded from JSON.
     return ""
 
 
@@ -234,15 +221,20 @@ def run_screening_for_job(db, job_id: int) -> None:
         db.add(job)
         db.commit()
         
-        sanctions_query = db.query(SanctionEntity).filter(SanctionEntity.is_active.is_(True))
-        if DEV_FAST_MODE:
-            sanctions_query = sanctions_query.limit(DEV_MAX_SANCTIONS)
-        sanctions: List[SanctionEntity] = sanctions_query.all()
+        sources_filter = None
+        try:
+            sources_filter = getattr(job, "sanction_source_filter", None)
+        except Exception:
+            sources_filter = None
 
-        raw_sanction_count = len(sanctions)
+        sanction_list_data = sanctions_for_matcher(sources=sources_filter)
+        if DEV_FAST_MODE:
+            sanction_list_data = sanction_list_data[:DEV_MAX_SANCTIONS]
+
+        raw_sanction_count = len(sanction_list_data)
         # total_transactions already set from count()
         
-        if total_transactions <= 0 or not sanctions:
+        if total_transactions <= 0 or not sanction_list_data:
             job.total_sanctions = raw_sanction_count
             job.status = "DONE"
             job.total_matches = 0
@@ -258,29 +250,13 @@ def run_screening_for_job(db, job_id: int) -> None:
             "final": job.threshold_score or 60.0
         }
 
-        # OPTIMASI DEDUPLIKASI
-        unique_sanction_map = {} 
-        for s in sanctions:
-            sanction_name = get_sanction_name(s)
-            if not sanction_name: continue
-            
-            norm_name = _normalize_name(sanction_name)
-            
-            if norm_name not in unique_sanction_map:
-                unique_sanction_map[norm_name] = {
-                    "id": s.id,
-                    "source_id": s.source_id,
-                    "name": sanction_name,
-                    "name_norm": norm_name,
-                    "dob_raw": s.date_of_birth_raw,
-                    "cit_raw": s.citizenship,
-                    "cit_norm": _normalize_country(s.citizenship),
-                    "source": s.source.code if s.source else "UNKNOWN"
-                }
-
-        sanction_list_data = list(unique_sanction_map.values())
-
-        matcher = HybridMatcher(sanction_list_data, name_key="primary_name")
+        matcher = HybridMatcher(sanction_list_data, name_key="name")
+        try:
+            backend = getattr(getattr(matcher, "index", None), "backend", None)
+            if backend:
+                logger.info("Job %s matcher backend=%s (env SLIS_MATCHER_BACKEND=%s)", job_id, backend, os.getenv("SLIS_MATCHER_BACKEND", "auto"))
+        except Exception:
+            pass
         
         job.total_sanctions = len(sanction_list_data)
         db.add(job)
@@ -292,9 +268,36 @@ def run_screening_for_job(db, job_id: int) -> None:
         total_matches = 0
         processed_count = 0
 
-        BATCH_SIZE = 500
-        offset = 0
-        update_frequency = 10 if total_transactions < 200 else 50
+        # Default was 500; you can increase for throughput (e.g. 2000) if memory allows.
+        try:
+            BATCH_SIZE = int(os.getenv("SLIS_SCREENING_BATCH_SIZE", "2000"))
+        except Exception:
+            BATCH_SIZE = 2000
+        if BATCH_SIZE < 100:
+            BATCH_SIZE = 100
+        if BATCH_SIZE > 20000:
+            BATCH_SIZE = 20000
+        logger.info("Job %s processing batch_size=%s", job_id, BATCH_SIZE)
+
+        # Reduce DB overhead: configure how often we commit progress + how many results per flush.
+        try:
+            update_frequency = int(os.getenv("SLIS_SCREENING_PROGRESS_EVERY", "500"))
+        except Exception:
+            update_frequency = 500
+        if update_frequency < 10:
+            update_frequency = 10
+
+        try:
+            flush_size = int(os.getenv("SLIS_SCREENING_FLUSH_SIZE", "5000"))
+        except Exception:
+            flush_size = 5000
+        if flush_size < 500:
+            flush_size = 500
+        if flush_size > 50000:
+            flush_size = 50000
+
+        # Keyset pagination is significantly faster than OFFSET for large tables.
+        last_tx_id = 0
 
         while True:
             # Allow cancellation
@@ -305,9 +308,16 @@ def run_screening_for_job(db, job_id: int) -> None:
                 db.commit()
                 return
 
-            tx_chunk = tx_query_base.limit(BATCH_SIZE).offset(offset).all()
+            tx_chunk = (
+                tx_query_base
+                .filter(Transaction.id > last_tx_id)
+                .limit(BATCH_SIZE)
+                .all()
+            )
             if not tx_chunk:
                 break
+
+            last_tx_id = int(tx_chunk[-1].id)
 
             for tx in tx_chunk:
                 processed_count += 1
@@ -351,23 +361,35 @@ def run_screening_for_job(db, job_id: int) -> None:
                     res = ScreeningResult(
                         job_id=job.id,
                         transaction_id=tx.id,
-                        sanction_entity_id=match["sanction_id"],
-                        sanction_source_id=s_data.get("source_id"),
+                        sanction_entity_id=None,
+                        sanction_external_id=str(match["sanction_id"]),
+                        sanction_source_id=None,
+                        sanction_source_code=match.get("sanction_source"),
+                        sanction_snapshot_id=None,
                         target_role=role,
+                        target_name=party_name,
+                        target_name_normalized=q_norm,
+                        target_country=None,
+                        sanction_name=match.get("sanction_name"),
+                        sanction_name_normalized=_normalize_name(match.get("sanction_name")) if match.get("sanction_name") else None,
+                        sanction_dob_raw=match.get("sanction_dob"),
+                        sanction_citizenship=match.get("sanction_citizenship"),
                         name_score=match["name_score"],
                         dob_score=match["dob_score"],
                         citizenship_score=match["citizenship_score"],
                         final_score=match["final_score"],
+                        dob_match_type=match.get("match_details"),
+                        weighting_scheme=match.get("scheme"),
                         geographic_insights=match["geographic_insights"],
                     )
                     results_to_insert.append(res)
                     total_matches += 1
 
             # Flush Batch Insert
-            if len(results_to_insert) >= 1000:
+            if len(results_to_insert) >= flush_size:
                 db.bulk_save_objects(results_to_insert)
                 db.commit()
-                logger.info("Flushed 1000 screening results ke DB")
+                logger.info("Flushed %s screening results ke DB", flush_size)
                 results_to_insert.clear()
 
             # Persist progress for UI polling (DB-backed)
@@ -379,7 +401,7 @@ def run_screening_for_job(db, job_id: int) -> None:
                 db.add(job)
                 db.commit()
 
-            offset += BATCH_SIZE
+            # (keyset pagination advances via last_tx_id)
 
         # Final Flush
         if results_to_insert:
@@ -417,27 +439,9 @@ def search_single_entity(
     query_name = (name or "").strip()
     if not query_name: return []
 
-    sanctions = db.query(SanctionEntity).filter(SanctionEntity.is_active.is_(True)).all()
-    if not sanctions: return []
-
-    # Optimasi Deduplikasi
-    unique_sanction_map = {}
-    for s in sanctions:
-        s_name = get_sanction_name(s)
-        if not s_name: continue
-        norm = _normalize_name(s_name)
-        if norm not in unique_sanction_map:
-            unique_sanction_map[norm] = {
-                "id": s.id,
-                "name": s_name,
-                "name_norm": norm,
-                "dob_raw": s.date_of_birth_raw,
-                "cit_raw": s.citizenship,
-                "cit_norm": _normalize_country(s.citizenship),
-                "source": s.source.code if s.source else "UNKNOWN"
-            }
-            
-    sanction_list_data = list(unique_sanction_map.values())
+    sanction_list_data = sanctions_for_matcher()
+    if not sanction_list_data:
+        return []
 
     matcher = HybridMatcher(sanction_list_data, name_key="name")
 
@@ -464,28 +468,14 @@ def search_single_entity(
 def search_entities_bulk(
     db, queries: List[Dict[str, Any]], limit: int = 20,
     name_threshold: float = 60.0, final_threshold: float = 60.0,
+    sanction_sources: Any = None,
 ) -> List[Dict[str, Any]]:
     
     if not queries: return []
 
-    # Optimasi Deduplikasi
-    sanctions_orm = db.query(SanctionEntity).filter(SanctionEntity.is_active.is_(True)).all()
-    unique_sanction_map = {}
-    
-    for s in sanctions_orm:
-        s_name = s.primary_name_normalized or _normalize_name(s.primary_name)
-        if s_name not in unique_sanction_map:
-            unique_sanction_map[s_name] = {
-                "id": s.id,
-                "name": s.primary_name,
-                "name_norm": s_name,
-                "dob_raw": s.date_of_birth_raw,
-                "cit_raw": s.citizenship,
-                "cit_norm": _normalize_country(s.citizenship),
-                "source": s.source.code if s.source else "UNKNOWN"
-            }
-            
-    sanction_list_data = list(unique_sanction_map.values())
+    sanction_list_data = sanctions_for_matcher(sources=sanction_sources)
+    if not sanction_list_data:
+        return [{"request_id": q.get("id"), "query_data": q, "matches": [], "match_count": 0, "error": "No sanctions loaded"} for q in queries]
 
     matcher = HybridMatcher(sanction_list_data, name_key="name")
 

@@ -364,6 +364,7 @@
     </div>
 
     <form method="post">
+      <input type="hidden" name="transaction_source" value="batch">
       <!-- Batch Selection -->
       <div class="form-group">
         <label class="form-label" for="batch_id">
@@ -375,7 +376,7 @@
           {% for b in batches %}
             <option value="{{ b.id }}"
               {% if preselected_batch_id and preselected_batch_id == b.id %}selected{% endif %}>
-              #{{ b.id }} — {{ b.filename }} ({{ b.row_count }} baris, {{ b.created_at }})
+              #{{ b.id }} — {{ b.filename }} ({{ b.row_count }} baris, {{ b.created_at|wib_fmt('%Y-%m-%d %H:%M') }})
             </option>
           {% endfor %}
         </select>
@@ -384,12 +385,12 @@
 
       <!-- Name Score Threshold -->
       <div class="form-group">
-        <label class="form-label" for="threshold_name_score>Ambang Batas Skor Nama</label>
+        <label class="form-label" for="threshold_name_score">Ambang Batas Skor Nama</label>
         <div class="threshold-group">
           <div class="threshold-input-row">
-            <input type="range" name="threshold_name_score" id="threshold_name_score" class="form-control" value="70" min="0" max="100" 
+            <input type="range" name="threshold_name_score" id="threshold_name_score" class="form-control" value="{{ request.form.get('threshold_name_score', 70) }}" min="0" max="100" step="1"
                    oninput="updateThresholdDisplay(this, 'nameDisplay')">
-            <div class="threshold-value-display" id="nameDisplay">70%</div>
+            <div class="threshold-value-display" id="nameDisplay">{{ request.form.get('threshold_name_score', 70) }}%</div>
           </div>
           <div class="form-text">
             Skor minimum kesamaan nama untuk dipertimbangkan. Range: 0-100%
@@ -412,9 +413,9 @@
         <label class="form-label" for="threshold_score">Ambang Batas Skor Akhir</label>
         <div class="threshold-group">
           <div class="threshold-input-row">
-            <input type="range" name="threshold_score" id="threshold_score" class="form-control" value="60" min="0" max="100" 
+            <input type="range" name="threshold_score" id="threshold_score" class="form-control" value="{{ request.form.get('threshold_score', 60) }}" min="0" max="100" step="1"
                    oninput="updateThresholdDisplay(this, 'finalDisplay')">
-            <div class="threshold-value-display" id="finalDisplay">60%</div>
+            <div class="threshold-value-display" id="finalDisplay">{{ request.form.get('threshold_score', 60) }}%</div>
           </div>
           <div class="form-text">
             Skor gabungan minimum (nama + DOB + kewarganegaraan) agar dianggap potensial match
@@ -430,6 +431,18 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Sanction Source Filter -->
+      <div class="form-group">
+        <label class="form-label" for="sanction_source">Sanction List</label>
+        <select name="sanction_source" id="sanction_source" class="form-select">
+          <option value="ALL">ALL</option>
+          {% for s in sanction_sources or [] %}
+            <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Pilih source sanction yang dipakai untuk matching (opsional).</div>
       </div>
 
       <!-- Officer Information -->
@@ -469,5 +482,13 @@
   function updateThresholdDisplay(input, displayId) {
     document.getElementById(displayId).textContent = input.value + '%';
   }
+
+  // Ensure display stays in sync even if the browser restores form values.
+  document.addEventListener('DOMContentLoaded', function () {
+    var nameEl = document.getElementById('threshold_name_score');
+    if (nameEl) updateThresholdDisplay(nameEl, 'nameDisplay');
+    var finalEl = document.getElementById('threshold_score');
+    if (finalEl) updateThresholdDisplay(finalEl, 'finalDisplay');
+  });
 </script>
 {% endblock %}

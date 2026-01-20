@@ -12,7 +12,7 @@ load_dotenv()
 
 
 def main() -> int:
-    # Import engine (will fail fast if DATABASE_URL is missing)
+    # Import engine (uses DATABASE_URL if set, otherwise falls back to local SQLite)
     from slis.db import engine
 
     # IMPORTANT: models use their own Base metadata

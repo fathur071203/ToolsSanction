@@ -1,0 +1,14 @@
+from jinja2.runtime import LoopContext, Macro, Markup, Namespace, TemplateNotFound, TemplateReference, TemplateRuntimeError, Undefined, escape, identity, internalcode, markup_join, missing, str_join
+name = 'package.json'
+
+def root(context, missing=missing):
+    resolve = context.resolve_or_missing
+    undefined = environment.undefined
+    concat = environment.concat
+    cond_expr_undefined = Undefined
+    if 0: yield None
+    pass
+    yield '{\n  "name": "my-v0-project",\n  "version": "0.1.0",\n  "private": true,\n  "scripts": {\n    "dev": "next dev",\n    "build": "next build",\n    "start": "next start",\n    "lint": "eslint ."\n  },\n  "dependencies": {\n    "@hookform/resolvers": "^3.10.0",\n    "@radix-ui/react-accordion": "1.2.2",\n    "@radix-ui/react-alert-dialog": "1.1.4",\n    "@radix-ui/react-aspect-ratio": "1.1.1",\n    "@radix-ui/react-avatar": "1.1.2",\n    "@radix-ui/react-checkbox": "1.1.3",\n    "@radix-ui/react-collapsible": "1.1.2",\n    "@radix-ui/react-context-menu": "2.2.4",\n    "@radix-ui/react-dialog": "1.1.4",\n    "@radix-ui/react-dropdown-menu": "2.1.4",\n    "@radix-ui/react-hover-card": "1.1.4",\n    "@radix-ui/react-label": "2.1.1",\n    "@radix-ui/react-menubar": "1.1.4",\n    "@radix-ui/react-navigation-menu": "1.2.3",\n    "@radix-ui/react-popover": "1.1.4",\n    "@radix-ui/react-progress": "1.1.1",\n    "@radix-ui/react-radio-group": "1.2.2",\n    "@radix-ui/react-scroll-area": "1.2.2",\n    "@radix-ui/react-select": "2.1.4",\n    "@radix-ui/react-separator": "1.1.1",\n    "@radix-ui/react-slider": "1.2.2",\n    "@radix-ui/react-slot": "1.1.1",\n    "@radix-ui/react-switch": "1.1.2",\n    "@radix-ui/react-tabs": "1.1.2",\n    "@radix-ui/react-toast": "1.2.4",\n    "@radix-ui/react-toggle": "1.1.1",\n    "@radix-ui/react-toggle-group": "1.1.1",\n    "@radix-ui/react-tooltip": "1.1.6",\n    "@vercel/analytics": "1.3.1",\n    "autoprefixer": "^10.4.20",\n    "class-variance-authority": "^0.7.1",\n    "clsx": "^2.1.1",\n    "cmdk": "1.0.4",\n    "date-fns": "4.1.0",\n    "embla-carousel-react": "8.5.1",\n    "input-otp": "1.4.1",\n    "lucide-react": "^0.454.0",\n    "next": "16.0.3",\n    "next-themes": "^0.4.6",\n    "react": "19.2.0",\n    "react-day-picker": "9.8.0",\n    "react-dom": "19.2.0",\n    "react-hook-form": "^7.60.0",\n    "react-resizable-panels": "^2.1.7",\n    "recharts": "2.15.4",\n    "sonner": "^1.7.4",\n    "tailwind-merge": "^3.3.1",\n    "tailwindcss-animate": "^1.0.7",\n    "vaul": "^1.1.2",\n    "zod": "3.25.76"\n  },\n  "devDependencies": {\n    "@tailwindcss/postcss": "^4.1.9",\n    "@types/node": "^22",\n    "@types/react": "^19",\n    "@types/react-dom": "^19",\n    "postcss": "^8.5",\n    "tailwindcss": "^4.1.9",\n    "tw-animate-css": "1.3.3",\n    "typescript": "^5"\n  }\n}'
+
+blocks = {}
+debug_info = ''

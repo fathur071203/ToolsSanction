@@ -5,10 +5,14 @@ Project ini adalah aplikasi **Sanction List Intelligence Screening** dengan:
 - **API** untuk upload batch transaksi, import sanctions, dan submit screening job.
 - **Async worker (Celery)** untuk menjalankan screening di background.
 - **Redis** sebagai broker/result backend Celery.
-- **Postgres** sebagai database (contoh: Neon).
+- **Database**: bisa Postgres (contoh: Neon) atau lokal (SQLite).
 
 ## Komponen yang harus jalan
-1. **Postgres** (wajib) → lewat `DATABASE_URL`
+1. **Postgres (opsional)** → lewat `DATABASE_URL` (mis. Neon)
+2. **Lokal (default)** → bila `DATABASE_URL` tidak di-set, aplikasi otomatis pakai SQLite file di `data/local_db/slis.db`
+
+Untuk memaksa pakai DB lokal walaupun `DATABASE_URL` masih terisi (mis. masih ada config Neon), set:
+- `SLIS_USE_LOCAL_DB=1`
 2. **Redis** (wajib) → untuk Celery
 3. **Web** (Flask) → service UI/API
 4. **Worker** (Celery) → eksekusi job screening
@@ -18,7 +22,7 @@ Project ini adalah aplikasi **Sanction List Intelligence Screening** dengan:
 ## Konfigurasi Environment (.env)
 Buat file `.env` (jangan di-commit) berdasarkan `.env.example`.
 Minimal yang wajib:
-- `DATABASE_URL` (Postgres connection string)
+- `DATABASE_URL` (Postgres connection string) (opsional untuk dev)
 - `CELERY_BROKER_URL` dan `CELERY_RESULT_BACKEND` (Redis)
 
 ## First Run (inisialisasi schema DB)
@@ -115,6 +119,27 @@ Untuk import sanctions, database harus punya minimal 1 baris di tabel `sanction_
 - `column_mapping` (JSON) minimal berisi key `full_name` sesuai nama kolom di file.
 
 Kalau belum ada, import akan error: `sanction_source with code '...' not found`.
+
+## Sanctions via JSON (tanpa DB)
+Aplikasi bisa memakai **file JSON sebagai source-of-truth** untuk daftar sanctions yang dipakai saat screening/search.
+
+- Default path: `data/sanctions.json`
+- Override path via env var: `SLIS_SANCTIONS_JSON_PATH=/path/ke/sanctions.json`
+
+### Export sekali jalan dari DB → JSON
+Kalau sebelumnya sudah pernah import sanctions ke database dan ingin pindah ke mode JSON:
+
+```bash
+python scripts/export_sanctions_to_json.py --out data/sanctions.json
+```
+
+Opsi berguna:
+- `--limit 1000` untuk test
+- `--include-inactive` kalau mau ikut export record non-aktif
+
+Catatan: repo ini tidak punya migrasi. Kalau sebelumnya sudah ada tabel `screening_result` dengan FK ke `sanction_entity`,
+lebih aman pakai DB baru / drop & recreate schema (jalankan `python scripts/init_db.py`) supaya hasil screening bisa disimpan
+tanpa bergantung pada tabel `sanction_entity`.
 
 ## Catatan keamanan saat publish
 - Jangan commit `.env` ke GitHub. Kalau pernah terlanjur ter-push, **rotate credential** (password/token DB) dan pertimbangkan membersihkan history git.

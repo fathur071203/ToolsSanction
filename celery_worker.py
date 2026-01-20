@@ -1,12 +1,13 @@
-from slis import create_app
-from slis.celery_app import celery_app as celery, init_celery
+"""Celery worker entrypoint.
 
+Run (example):
+    celery -A celery_worker.celery worker -l info
+"""
 
-# Buat app Flask dan integrasikan dengan Celery
-flask_app = create_app()
-init_celery(flask_app)
+from slis.celery_app import celery_app as celery
 
-from slis.tasks import run_screening_task
+# Ensure task modules are imported/registered
+from slis import tasks as _tasks  # noqa: F401
 
 
 @celery.task
