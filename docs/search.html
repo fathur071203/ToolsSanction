@@ -1,0 +1,1861 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SLIS - Sanction List Screening System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap 5 CDN -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+    crossorigin="anonymous"
+  >
+
+  <!-- Google Fonts for modern typography -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* Complete redesign: modern color system, typography, and layout */
+    :root {
+      --primary: #0f172a;
+      --primary-light: #1e293b;
+      --primary-accent: #0ea5e9;
+      --secondary: #6366f1;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --background: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --text-light: #94a3b8;
+
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.10);
+      --shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.16);
+      --ring: 0 0 0 3px rgba(14, 165, 233, 0.18);
+    }
+
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    body {
+      --app-bg-opacity: 0.24;
+      --app-bg-blur: 3px;
+      --app-particles-opacity: 0.18;
+      background-color: var(--background);
+      position: relative;
+      isolation: isolate;
+      color: var(--text-primary);
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
+
+    /* App background (all pages): blurred image + soft gradient */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(135deg, rgba(2, 6, 23, 0.44) 0%, rgba(2, 6, 23, 0.10) 45%, rgba(2, 6, 23, 0.32) 100%),
+        url("static/bgutama.png");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: var(--app-bg-opacity);
+      filter: blur(var(--app-bg-blur)) saturate(1.08) contrast(1.02);
+      transform: scale(1.04);
+      z-index: -2;
+      pointer-events: none;
+    }
+
+    /* Subtle particle overlay (all pages) */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: -20vh -20vw;
+      z-index: -1;
+      pointer-events: none;
+      opacity: var(--app-particles-opacity);
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.30) 0 1px, transparent 2px),
+        radial-gradient(circle at 30% 80%, rgba(255, 255, 255, 0.22) 0 1px, transparent 2px),
+        radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.18) 0 1px, transparent 2px),
+        radial-gradient(circle at 85% 65%, rgba(255, 255, 255, 0.20) 0 1px, transparent 2px),
+        radial-gradient(circle at 55% 15%, rgba(255, 255, 255, 0.14) 0 1px, transparent 2px),
+        radial-gradient(circle at 45% 55%, rgba(255, 255, 255, 0.16) 0 1px, transparent 2px);
+      background-size: 220px 220px, 260px 260px, 240px 240px, 300px 300px, 280px 280px, 320px 320px;
+      background-repeat: repeat;
+      filter: blur(0.2px);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      body::after {
+        animation: particleDrift 22s linear infinite;
+      }
+      @keyframes particleDrift {
+        0% { transform: translate3d(0, 0, 0); }
+        100% { transform: translate3d(80px, -60px, 0); }
+      }
+    }
+
+    a { transition: color 0.2s ease, opacity 0.2s ease; }
+
+    /* Gentle page entrance */
+    @media (prefers-reduced-motion: no-preference) {
+      main.container { animation: fadeUp 420ms ease both; }
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    }
+
+    /* Home modifier (optional): slightly stronger background */
+    body.home-bg {
+      --app-bg-opacity: 0.28;
+      --app-particles-opacity: 0.22;
+    }
+
+    /* Navbar Styling */
+    .navbar {
+      background:
+        linear-gradient(90deg, rgba(0, 85, 150, 0.94) 0%, rgba(11, 107, 181, 0.92) 55%, rgba(0, 85, 150, 0.94) 100%);
+      padding: 0.75rem 0;
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.18);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 1030;
+    }
+
+    .navbar .container-fluid {
+      max-width: 1200px;
+      padding-left: 1.25rem;
+      padding-right: 1.25rem;
+    }
+
+    .navbar-brand {
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: rgba(255, 255, 255, 0.96) !important;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.25rem 0;
+    }
+
+    .navbar-brand:hover {
+      opacity: 0.92;
+    }
+
+    .navbar-logo {
+      width: clamp(72px, 6vw, 112px);
+      height: auto;
+      max-height: 96px;
+      object-fit: contain;
+    }
+
+    .nav-link {
+      color: rgba(255, 255, 255, 0.86) !important;
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 0.55rem 0.9rem !important;
+      border-radius: 999px;
+      transition: all 0.2s ease;
+      position: relative;
+      line-height: 1.1;
+    }
+
+    .nav-link:hover {
+      background-color: rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.98) !important;
+    }
+
+    .nav-link.active {
+      background-color: rgba(255, 255, 255, 0.20);
+      color: rgba(255, 255, 255, 0.98) !important;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      display: none;
+    }
+
+    .navbar-toggler {
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 10px;
+      padding: 0.45rem 0.6rem;
+      box-shadow: 0 6px 18px rgba(2, 6, 23, 0.14);
+    }
+
+    .navbar-toggler:focus {
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+    }
+
+    @media (max-width: 991.98px) {
+      .navbar .navbar-nav {
+        padding-top: 0.5rem;
+        gap: 0.25rem;
+      }
+      .nav-link {
+        border-radius: 10px;
+      }
+    }
+
+    /* Main Container */
+    main.container {
+      max-width: 1200px;
+      padding: 1.5rem;
+    }
+
+    /* Glass utility (optional) */
+    .glass {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* Alerts */
+    .alert {
+      border-radius: 8px;
+      border: none;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .alert-success {
+      background-color: #ecfdf5;
+      color: #065f46;
+    }
+
+    .alert-danger {
+      background-color: #fef2f2;
+      color: #7f1d1d;
+    }
+
+    .alert-warning {
+      background-color: #fffbeb;
+      color: #78350f;
+    }
+
+    .alert-info {
+      background-color: #f0f9ff;
+      color: #0c2d6b;
+    }
+
+    /* Button Styles */
+    .btn {
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 0.6rem 1.2rem;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .btn-sm {
+      padding: 0.45rem 0.85rem;
+      font-size: 0.85rem;
+      border-radius: 10px;
+    }
+
+    .btn:focus-visible {
+      outline: none;
+      box-shadow: var(--ring);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary-accent), #38bdf8);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #0284c7;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, var(--secondary), #8b5cf6);
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background-color: #4f46e5;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, var(--success), #22c55e);
+      color: white;
+    }
+
+    .btn-success:hover {
+      background-color: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-warning {
+      background: linear-gradient(135deg, var(--warning), #fb923c);
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background-color: #d97706;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-lg {
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+    }
+
+    .btn-link {
+      color: var(--primary-accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .btn-link:hover {
+      color: #0284c7;
+      text-decoration: underline;
+    }
+
+    /* Card Styles */
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+      background-color: var(--surface);
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      background-color: var(--background);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .card-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .card-text {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    /* Form Elements */
+    .form-label {
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.625rem 0.875rem;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      background-color: var(--surface);
+      color: var(--text-primary);
+    }
+
+    .form-control:focus, .form-select:focus {
+      border-color: var(--primary-accent);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+      outline: none;
+    }
+
+    .form-text {
+      color: var(--text-light);
+      font-size: 0.85rem;
+      margin-top: 0.25rem;
+    }
+
+    /* Badge Styles */
+    .badge {
+      border-radius: 20px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .bg-success {
+      background-color: var(--success) !important;
+    }
+
+    .bg-warning {
+      background-color: var(--warning) !important;
+    }
+
+    .bg-danger {
+      background-color: var(--danger) !important;
+    }
+
+    /* Table Styles */
+    .table {
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .table thead {
+      background-color: var(--background);
+      border-bottom: 2px solid var(--border);
+    }
+
+    .table th {
+      font-weight: 600;
+      color: var(--text-primary);
+      padding: 1rem 0.75rem;
+    }
+
+    .table td {
+      padding: 0.875rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    .table-striped tbody tr:hover {
+      background-color: rgba(14, 165, 233, 0.03);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      main.container {
+        padding: 1rem;
+      }
+
+      .navbar-brand {
+        font-size: 1.25rem;
+      }
+
+      .nav-link {
+        padding: 0.75rem 0.5rem !important;
+      }
+    }
+  </style>
+
+  
+<style>
+  .search-container { max-width: 1200px; margin: 0 auto; }
+  .search-header { margin-bottom: 2.5rem; text-align: center; }
+  .search-header h1 { font-size: 2rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; }
+  .search-header p { color: var(--text-secondary); font-size: 0.95rem; margin: 0; }
+
+  /* Form Styles */
+  .search-form-card { background-color: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); margin-bottom: 2rem; }
+  .search-form-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
+  .form-icon { width: 32px; height: 32px; background-color: rgba(14, 165, 233, 0.1); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+  
+  .rows-container { display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 1.5rem; }
+  .query-row { display: grid; grid-template-columns: 1fr auto; gap: 1rem; padding: 1.5rem; background-color: var(--background); border: 1px solid var(--border); border-radius: 8px; align-items: flex-end; position: relative; }
+  .advanced-open .query-row { grid-template-columns: 1fr 1fr 1fr auto; }
+  .query-row-number { position: absolute; top: -12px; left: 12px; background-color: var(--primary-accent); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; }
+  
+  .form-group { display: flex; flex-direction: column; }
+  .form-label { font-weight: 500; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
+  .label-required { color: var(--danger); font-weight: 700; }
+  .label-optional { color: var(--text-light); font-size: 0.75rem; font-weight: 400; }
+  .form-control { border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; font-size: 0.95rem; background-color: var(--surface); color: var(--text-primary); transition: all 0.2s ease; }
+  .form-control:focus { border-color: var(--primary-accent); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); outline: none; }
+  .form-text { margin-top: 0.35rem; font-size: 0.75rem; color: var(--text-light); }
+  
+  .row-actions { display: flex; gap: 0.5rem; }
+  .btn-remove { background-color: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); padding: 0.6rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all 0.2s ease; }
+  .btn-remove:hover { background-color: var(--danger); color: white; }
+  .btn-add-row { background-color: rgba(34, 197, 94, 0.1); color: #22c55e; border: 1px dashed #22c55e; padding: 1rem; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500; transition: all 0.2s ease; text-align: center; display: block; width: 100%; }
+  .btn-add-row:hover { background-color: #22c55e; color: white; }
+  .info-box { background-color: rgba(14, 165, 233, 0.05); border-left: 4px solid var(--primary-accent); border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; color: var(--text-primary); font-size: 0.9rem; }
+  .form-actions { display: flex; gap: 1rem; justify-content: center; }
+  .form-actions .btn { min-width: 150px; }
+
+  /* Loading state below form */
+  .loading-state { 
+    display: none; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 1rem; 
+    padding: 1.5rem; 
+    margin-top: 1rem;
+    background-color: rgba(14, 165, 233, 0.05); 
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+  }
+  .loading-state.show { display: flex; }
+  .loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(14, 165, 233, 0.2);
+    border-top-color: var(--primary-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Results with horizontal card layout */
+  .results-container { margin-top: 2rem; }
+  .results-header { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border); }
+  
+  /* Horizontal scrollable cards */
+  .name-cards-container {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 1rem 0;
+    margin-bottom: 2rem;
+    display: flex;
+    gap: 1rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-accent) var(--background);
+  }
+  .name-cards-container::-webkit-scrollbar {
+    height: 8px;
+  }
+  .name-cards-container::-webkit-scrollbar-track {
+    background: var(--background);
+    border-radius: 4px;
+  }
+  .name-cards-container::-webkit-scrollbar-thumb {
+    background: var(--primary-accent);
+    border-radius: 4px;
+  }
+  
+  .name-card {
+    min-width: 280px;
+    flex-shrink: 0;
+    background-color: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: normal;
+  }
+  .name-card:hover {
+    border-color: var(--primary-accent);
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+    transform: translateY(-2px);
+  }
+  .name-card.active {
+    border-color: var(--primary-accent);
+    background-color: rgba(14, 165, 233, 0.05);
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+  }
+  .name-card-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    line-clamp: 2; 
+  }
+  .name-card-matches {
+    display: inline-block;
+    background-color: rgba(14, 165, 233, 0.1);
+    color: var(--primary-accent);
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  /* Table with simplified scores */
+  .results-table-container {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 1rem;
+  }
+  .results-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .results-table th { padding: 1.25rem; text-align: left; font-weight: 600; color: var(--text-primary); white-space: nowrap; background-color: var(--background); border-bottom: 2px solid var(--border); }
+  .results-table td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); color: var(--text-primary); vertical-align: top; }
+  .results-table tbody tr:hover { background-color: rgba(14, 165, 233, 0.03); }
+  .results-table tbody tr:last-child td { border-bottom: none; }
+
+  .entity-name { font-weight: 500; color: var(--text-primary); display: block; }
+  .entity-meta { font-size: 0.8rem; color: var(--text-light); margin-top: 2px; }
+  
+  .score-badge { display: inline-block; padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 600; font-size: 0.85rem; font-family: 'Courier New', monospace; }
+  .score-high { background-color: rgba(239, 68, 68, 0.1); color: var(--danger); }
+  .score-medium { background-color: rgba(245, 158, 11, 0.1); color: var(--warning); }
+  .score-low { background-color: rgba(14, 165, 233, 0.1); color: var(--primary-accent); }
+
+  /* Score breakdown collapsible */
+  .score-cell {
+    position: relative;
+  }
+  .score-breakdown-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-top: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.8rem;
+    transition: color 0.2s ease;
+  }
+  .score-breakdown-btn:hover {
+    color: var(--text-primary);
+  }
+  .score-breakdown-btn .arrow-icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+    font-size: 0.7rem;
+  }
+  .score-breakdown-btn.expanded .arrow-icon {
+    transform: rotate(180deg);
+  }
+  
+  .score-breakdown-section {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, margin 0.3s ease;
+  }
+  .score-breakdown-section.expanded {
+    max-height: 300px;
+    margin-top: 0.75rem;
+  }
+  .score-breakdown-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background-color: rgba(14, 165, 233, 0.03);
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+  .score-breakdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.35rem 0;
+  }
+  .score-breakdown-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .score-breakdown-value {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  .geo-collapsible-btn { 
+    display: flex; 
+    align-items: center; 
+    gap: 0.5rem; 
+    cursor: pointer; 
+    color: var(--primary-accent); 
+    font-size: 0.85rem; 
+    font-weight: 500; 
+    background: none; 
+    border: none; 
+    padding: 0.5rem 0; 
+    margin-top: 0.5rem;
+    transition: all 0.2s ease;
+  }
+  .geo-collapsible-btn:hover { color: var(--text-primary); }
+  .geo-collapsible-btn .arrow-icon { 
+    display: inline-block; 
+    transition: transform 0.3s ease; 
+  }
+  .geo-collapsible-btn.expanded .arrow-icon { 
+    transform: rotate(180deg); 
+  }
+
+  .geo-profiling-section { 
+    max-height: 0; 
+    overflow: hidden; 
+    transition: max-height 0.3s ease, padding 0.3s ease; 
+    background-color: rgba(14, 165, 233, 0.03); 
+    border-bottom: 1px solid var(--border);
+  }
+  .geo-profiling-section.expanded { 
+    max-height: 500px; 
+    padding: 1.25rem; 
+  }
+
+  .geo-profiling-content { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 0.75rem; 
+  }
+
+  .geo-item { 
+    display: flex; 
+    align-items: flex-start; 
+    gap: 0.75rem; 
+    padding: 0.75rem; 
+    background-color: var(--surface); 
+    border-radius: 6px; 
+    border-left: 3px solid var(--primary-accent);
+  }
+  .geo-item-icon { 
+    font-size: 1rem; 
+    flex-shrink: 0; 
+    margin-top: 2px;
+  }
+  .geo-item-content { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 0.25rem; 
+  }
+  .geo-item-label { 
+    font-weight: 500; 
+    color: var(--text-primary); 
+    font-size: 0.9rem; 
+  }
+  .geo-item-value { 
+    color: var(--text-secondary); 
+    font-size: 0.85rem; 
+  }
+
+  .geo-insights-box { 
+    background-color: #fef3c7; 
+    border: 1px solid #fcd34d; 
+    border-radius: 6px; 
+    padding: 0.75rem; 
+    color: #92400e; 
+    font-size: 0.85rem;
+  }
+  .geo-insights-box strong { 
+    display: block; 
+    font-weight: 600; 
+    margin-bottom: 0.5rem; 
+  }
+  .geo-insights-list { 
+    list-style: none; 
+    padding: 0; 
+    margin: 0; 
+  }
+  .geo-insights-list li { 
+    padding: 0.35rem 0; 
+  }
+  .geo-insights-list li:before { 
+    content: '⚠️ '; 
+    margin-right: 0.5rem; 
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .query-row { grid-template-columns: 1fr; padding-top: 2rem; }
+    .query-row-number { top: -6px; }
+    .row-actions { grid-column: 1 / -1; }
+    .results-table th, .results-table td { padding: 0.75rem 0.5rem; font-size: 0.8rem; }
+    .geo-profiling-section.expanded { max-height: 600px; }
+    .name-card { min-width: 220px; }
+  }
+
+  /* Adding searchable select dropdown styles */
+  .searchable-select-wrapper {
+    position: relative;
+  }
+  
+  .searchable-select-input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    background-color: var(--surface);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+  
+  .searchable-select-input:focus {
+    border-color: var(--primary-accent);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    outline: none;
+    cursor: text;
+  }
+  
+  .searchable-select-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+  }
+  
+  .searchable-select-dropdown.show {
+    display: block;
+  }
+  
+  .searchable-select-option {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .searchable-select-option:hover {
+    background-color: rgba(14, 165, 233, 0.08);
+  }
+  
+  .searchable-select-option.selected {
+    background-color: rgba(14, 165, 233, 0.12);
+    font-weight: 500;
+  }
+  
+  .searchable-select-option .country-flag {
+    font-size: 1.1rem;
+  }
+  
+  .searchable-select-option .country-info {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .searchable-select-option .country-name {
+    font-weight: 500;
+  }
+  
+  .searchable-select-option .country-code {
+    font-size: 0.75rem;
+    color: var(--text-light);
+  }
+  
+  .searchable-select-empty {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-light);
+    font-size: 0.85rem;
+  }
+  
+  .select-clear-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    padding: 0.25rem;
+    font-size: 1.1rem;
+    display: none;
+    transition: color 0.2s ease;
+  }
+  
+  .select-clear-btn:hover {
+    color: var(--danger);
+  }
+  
+  .select-clear-btn.show {
+    display: block;
+  }
+
+  /* Advanced settings (collapsed by default) */
+  .advanced-panel { display: none; margin-bottom: 1.25rem; }
+  .advanced-open .advanced-panel { display: block; }
+  .advanced-toggle-row { display: flex; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .advanced-toggle-hint { color: var(--text-light); font-size: 0.85rem; margin: 0; }
+
+  .query-dob-group, .query-cit-group { display: none; }
+  .advanced-open .query-dob-group, .advanced-open .query-cit-group { display: flex; }
+
+  /* Sanction checkbox list */
+  .sanction-checkboxes {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    background: var(--surface);
+    max-height: 180px;
+    overflow-y: auto;
+  }
+</style>
+
+</head>
+<body class="">
+<!-- Modernized navbar with gradient and new styling -->
+<nav class="navbar navbar-expand-lg navbar-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="index.html">
+      <img src="static/logo.png" alt="Logo" class="navbar-logo">
+      SLIS
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarNav" aria-controls="navbarNav"
+            aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link " href="index.html">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="sanctions_manage.html">Sanctions</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="screening_jobs.html">Jobs</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="data_explorer.html">Data Explorer</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="file_splitter.html">Splitting</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="rekon_ai.html">Rekon-AI</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="lhp_ai.html">LHP-AI</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <!-- Enhanced alert system with new color scheme -->
+  
+    
+  
+
+  
+<div class="search-container">
+  <div class="search-header">
+    <h1>Screening Cepat Nasabah</h1>
+    <p>Lakukan screening instan untuk satu atau lebih nasabah</p>
+  </div>
+
+  <div class="search-form-card">
+    <div class="search-form-title">
+      <div class="form-icon">🔍</div>
+      Masukkan Data Nasabah
+    </div>
+    <div class="info-box">
+      <strong>Ringkas:</strong>
+      Isi <strong>Nama</strong> lalu klik <strong>Lakukan Screening</strong>. Jika perlu, buka <strong>Pengaturan</strong> untuk threshold, sanction list, dan data tambahan.
+    </div>
+
+    <form id="bulkSearchForm" class="quick-form">
+      <div class="advanced-toggle-row">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleAdvancedBtn">Pengaturan ▾</button>
+        <p class="advanced-toggle-hint">Default: hanya Nama (paling cepat).</p>
+      </div>
+
+      <div class="advanced-panel" id="advancedPanel">
+        <div class="threshold-group" style="margin-bottom: 1.25rem;">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Ambang Batas Skor Nama</label>
+            <div class="threshold-input-row">
+              <input type="range" id="bulkNameThreshold" class="form-control" value="70" min="0" max="100" step="1">
+              <div class="threshold-value-display" id="bulkNameThresholdDisplay">70%</div>
+            </div>
+            <div class="form-text">Minimal skor kesamaan nama agar kandidat dipertimbangkan.</div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Ambang Batas Skor Akhir</label>
+            <div class="threshold-input-row">
+              <input type="range" id="bulkFinalThreshold" class="form-control" value="60" min="0" max="100" step="1">
+              <div class="threshold-value-display" id="bulkFinalThresholdDisplay">60%</div>
+            </div>
+            <div class="form-text">Minimal skor akhir agar match ditampilkan.</div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Sanction List</label>
+            <div id="bulkSanctionCheckboxes" class="sanction-checkboxes">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="bulk_src_all" value="ALL" checked>
+                <label class="form-check-label" for="bulk_src_all">ALL (pilih ini untuk semua)</label>
+              </div>
+              
+            </div>
+            <div class="form-text">Centang 1+ source. Jika ada pilihan spesifik, ALL akan diabaikan.</div>
+          </div>
+        </div>
+
+        <button type="button" class="btn-add-row" onclick="addQueryRow()">+ Tambah Nasabah</button>
+      </div>
+
+      <div class="rows-container" id="rowsContainer"></div>
+      <div class="form-actions" style="margin-top: 2rem;">
+        <a href="index.html" class="btn btn-outline-primary">Kembali</a>
+        <button type="submit" class="btn btn-primary" id="submitBtn">Lakukan Screening →</button>
+      </div>
+      <!-- Loading state below form instead of button -->
+      <div class="loading-state" id="loadingState">
+        <div class="loading-spinner"></div>
+        <span>Screening sedang dilakukan, harap tunggu...</span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Results container with horizontal cards -->
+  <div id="resultsContainer" style="display: none;">
+    <div class="results-container">
+      <div class="results-header">
+        <h2>Hasil Pencarian</h2>
+        <div class="results-info" id="resultsInfo"></div>
+      </div>
+      <!-- Horizontal scrollable cards for name selection -->
+      <div class="name-cards-container" id="nameCardsContainer"></div>
+      <!-- Table for selected name's matches -->
+      <div id="resultsTableContainer"></div>
+    </div>
+  </div>
+</div>
+
+<template id="queryRowTemplate">
+  <div class="query-row">
+    <div class="query-row-number">-</div>
+    <div class="form-group">
+      <label class="form-label" for="query-name">Nama Nasabah <span class="label-required">*</span></label>
+      <input type="text" id="query-name" class="form-control query-name" placeholder="Contoh: Budi Santoso" required>
+    </div>
+    <div class="form-group query-dob-group">
+      <label class="form-label" for="query-dob">Tanggal Lahir <span class="label-optional">(Opsional)</span></label>
+      <input type="date" id="query-dob" class="form-control query-dob">
+    </div>
+    <div class="form-group query-cit-group">
+      <label class="form-label" for="query-citizenship">Kewarganegaraan <span class="label-optional">(Opsional)</span></label>
+      <div class="searchable-select-wrapper">
+        <input
+          type="text"
+          id="query-citizenship"
+          class="searchable-select-input query-citizenship"
+          placeholder="Ketik atau pilih negara..."
+          autocomplete="off"
+        >
+        <button type="button" class="select-clear-btn" onclick="clearSelection(this)">×</button>
+        <div class="searchable-select-dropdown"></div>
+      </div>
+    </div>
+    <div class="row-actions">
+      <button type="button" class="btn-remove" onclick="removeQueryRow(this)">Hapus</button>
+    </div>
+  </div>
+</template>
+
+<script>
+  const COUNTRIES = [
+    { code: 'AF', code3: 'AFG', nameEn: 'Afghanistan', nameId: 'Afganistan', flag: '🇦🇫' },
+    { code: 'AL', code3: 'ALB', nameEn: 'Albania', nameId: 'Albania', flag: '🇦🇱' },
+    { code: 'DZ', code3: 'DZA', nameEn: 'Algeria', nameId: 'Aljazair', flag: '🇩🇿' },
+    { code: 'AD', code3: 'AND', nameEn: 'Andorra', nameId: 'Andorra', flag: '🇦🇩' },
+    { code: 'AO', code3: 'AGO', nameEn: 'Angola', nameId: 'Angola', flag: '🇦🇴' },
+    { code: 'AG', code3: 'ATG', nameEn: 'Antigua and Barbuda', nameId: 'Antigua dan Barbuda', flag: '🇦🇬' },
+    { code: 'AR', code3: 'ARG', nameEn: 'Argentina', nameId: 'Argentina', flag: '🇦🇷' },
+    { code: 'AM', code3: 'ARM', nameEn: 'Armenia', nameId: 'Armenia', flag: '🇦🇲' },
+    { code: 'AU', code3: 'AUS', nameEn: 'Australia', nameId: 'Australia', flag: '🇦🇺' },
+    { code: 'AT', code3: 'AUT', nameEn: 'Austria', nameId: 'Austria', flag: '🇦🇹' },
+    { code: 'AZ', code3: 'AZE', nameEn: 'Azerbaijan', nameId: 'Azerbaijan', flag: '🇦🇿' },
+
+    { code: 'BS', code3: 'BHS', nameEn: 'Bahamas', nameId: 'Bahama', flag: '🇧🇸' },
+    { code: 'BH', code3: 'BHR', nameEn: 'Bahrain', nameId: 'Bahrain', flag: '🇧🇭' },
+    { code: 'BD', code3: 'BGD', nameEn: 'Bangladesh', nameId: 'Bangladesh', flag: '🇧🇩' },
+    { code: 'BB', code3: 'BRB', nameEn: 'Barbados', nameId: 'Barbados', flag: '🇧🇧' },
+    { code: 'BY', code3: 'BLR', nameEn: 'Belarus', nameId: 'Belarus', flag: '🇧🇾' },
+    { code: 'BE', code3: 'BEL', nameEn: 'Belgium', nameId: 'Belgia', flag: '🇧🇪' },
+    { code: 'BZ', code3: 'BLZ', nameEn: 'Belize', nameId: 'Belize', flag: '🇧🇿' },
+    { code: 'BJ', code3: 'BEN', nameEn: 'Benin', nameId: 'Benin', flag: '🇧🇯' },
+    { code: 'BT', code3: 'BTN', nameEn: 'Bhutan', nameId: 'Bhutan', flag: '🇧🇹' },
+    { code: 'BO', code3: 'BOL', nameEn: 'Bolivia', nameId: 'Bolivia', flag: '🇧🇴' },
+    { code: 'BA', code3: 'BIH', nameEn: 'Bosnia and Herzegovina', nameId: 'Bosnia dan Herzegovina', flag: '🇧🇦' },
+    { code: 'BW', code3: 'BWA', nameEn: 'Botswana', nameId: 'Botswana', flag: '🇧🇼' },
+    { code: 'BR', code3: 'BRA', nameEn: 'Brazil', nameId: 'Brasil', flag: '🇧🇷' },
+    { code: 'BN', code3: 'BRN', nameEn: 'Brunei', nameId: 'Brunei', flag: '🇧🇳' },
+    { code: 'BG', code3: 'BGR', nameEn: 'Bulgaria', nameId: 'Bulgaria', flag: '🇧🇬' },
+    { code: 'BF', code3: 'BFA', nameEn: 'Burkina Faso', nameId: 'Burkina Faso', flag: '🇧🇫' },
+    { code: 'BI', code3: 'BDI', nameEn: 'Burundi', nameId: 'Burundi', flag: '🇧🇮' },
+
+    { code: 'CV', code3: 'CPV', nameEn: 'Cabo Verde', nameId: 'Tanjung Verde', flag: '🇨🇻' },
+    { code: 'KH', code3: 'KHM', nameEn: 'Cambodia', nameId: 'Kamboja', flag: '🇰🇭' },
+    { code: 'CM', code3: 'CMR', nameEn: 'Cameroon', nameId: 'Kamerun', flag: '🇨🇲' },
+    { code: 'CA', code3: 'CAN', nameEn: 'Canada', nameId: 'Kanada', flag: '🇨🇦' },
+    { code: 'CF', code3: 'CAF', nameEn: 'Central African Republic', nameId: 'Republik Afrika Tengah', flag: '🇨🇫' },
+    { code: 'TD', code3: 'TCD', nameEn: 'Chad', nameId: 'Chad', flag: '🇹🇩' },
+    { code: 'CL', code3: 'CHL', nameEn: 'Chile', nameId: 'Chili', flag: '🇨🇱' },
+    { code: 'CN', code3: 'CHN', nameEn: 'China', nameId: 'Tiongkok', flag: '🇨🇳' },
+    { code: 'CO', code3: 'COL', nameEn: 'Colombia', nameId: 'Kolombia', flag: '🇨🇴' },
+    { code: 'KM', code3: 'COM', nameEn: 'Comoros', nameId: 'Komoro', flag: '🇰🇲' },
+    { code: 'CD', code3: 'COD', nameEn: 'Congo (Democratic Republic)', nameId: 'Kongo (Republik Demokratik)', flag: '🇨🇩' },
+    { code: 'CG', code3: 'COG', nameEn: 'Congo (Republic)', nameId: 'Kongo (Republik)', flag: '🇨🇬' },
+    { code: 'CR', code3: 'CRI', nameEn: 'Costa Rica', nameId: 'Kosta Rika', flag: '🇨🇷' },
+    { code: 'CI', code3: 'CIV', nameEn: 'Cote d\'Ivoire', nameId: 'Pantai Gading', flag: '🇨🇮' },
+    { code: 'HR', code3: 'HRV', nameEn: 'Croatia', nameId: 'Kroasia', flag: '🇭🇷' },
+    { code: 'CU', code3: 'CUB', nameEn: 'Cuba', nameId: 'Kuba', flag: '🇨🇺' },
+    { code: 'CY', code3: 'CYP', nameEn: 'Cyprus', nameId: 'Siprus', flag: '🇨🇾' },
+    { code: 'CZ', code3: 'CZE', nameEn: 'Czech Republic', nameId: 'Republik Ceko', flag: '🇨🇿' },
+
+    { code: 'DK', code3: 'DNK', nameEn: 'Denmark', nameId: 'Denmark', flag: '🇩🇰' },
+    { code: 'DJ', code3: 'DJI', nameEn: 'Djibouti', nameId: 'Djibouti', flag: '🇩🇯' },
+    { code: 'DM', code3: 'DMA', nameEn: 'Dominica', nameId: 'Dominika', flag: '🇩🇲' },
+    { code: 'DO', code3: 'DOM', nameEn: 'Dominican Republic', nameId: 'Republik Dominika', flag: '🇩🇴' },
+
+    { code: 'EC', code3: 'ECU', nameEn: 'Ecuador', nameId: 'Ekuador', flag: '🇪🇨' },
+    { code: 'EG', code3: 'EGY', nameEn: 'Egypt', nameId: 'Mesir', flag: '🇪🇬' },
+    { code: 'SV', code3: 'SLV', nameEn: 'El Salvador', nameId: 'El Salvador', flag: '🇸🇻' },
+    { code: 'GQ', code3: 'GNQ', nameEn: 'Equatorial Guinea', nameId: 'Guinea Khatulistiwa', flag: '🇬🇶' },
+    { code: 'ER', code3: 'ERI', nameEn: 'Eritrea', nameId: 'Eritrea', flag: '🇪🇷' },
+    { code: 'EE', code3: 'EST', nameEn: 'Estonia', nameId: 'Estonia', flag: '🇪🇪' },
+    { code: 'SZ', code3: 'SWZ', nameEn: 'Eswatini', nameId: 'Eswatini', flag: '🇸🇿' },
+    { code: 'ET', code3: 'ETH', nameEn: 'Ethiopia', nameId: 'Ethiopia', flag: '🇪🇹' },
+
+    { code: 'FJ', code3: 'FJI', nameEn: 'Fiji', nameId: 'Fiji', flag: '🇫🇯' },
+    { code: 'FI', code3: 'FIN', nameEn: 'Finland', nameId: 'Finlandia', flag: '🇫🇮' },
+    { code: 'FR', code3: 'FRA', nameEn: 'France', nameId: 'Prancis', flag: '🇫🇷' },
+
+    { code: 'GA', code3: 'GAB', nameEn: 'Gabon', nameId: 'Gabon', flag: '🇬🇦' },
+    { code: 'GM', code3: 'GMB', nameEn: 'Gambia', nameId: 'Gambia', flag: '🇬🇲' },
+    { code: 'GE', code3: 'GEO', nameEn: 'Georgia', nameId: 'Georgia', flag: '🇬🇪' },
+    { code: 'DE', code3: 'DEU', nameEn: 'Germany', nameId: 'Jerman', flag: '🇩🇪' },
+    { code: 'GH', code3: 'GHA', nameEn: 'Ghana', nameId: 'Ghana', flag: '🇬🇭' },
+    { code: 'GR', code3: 'GRC', nameEn: 'Greece', nameId: 'Yunani', flag: '🇬🇷' },
+    { code: 'GD', code3: 'GRD', nameEn: 'Grenada', nameId: 'Grenada', flag: '🇬🇩' },
+    { code: 'GT', code3: 'GTM', nameEn: 'Guatemala', nameId: 'Guatemala', flag: '🇬🇹' },
+    { code: 'GN', code3: 'GIN', nameEn: 'Guinea', nameId: 'Guinea', flag: '🇬🇳' },
+    { code: 'GW', code3: 'GNB', nameEn: 'Guinea-Bissau', nameId: 'Guinea-Bissau', flag: '🇬🇼' },
+    { code: 'GY', code3: 'GUY', nameEn: 'Guyana', nameId: 'Guyana', flag: '🇬🇾' },
+
+    { code: 'HT', code3: 'HTI', nameEn: 'Haiti', nameId: 'Haiti', flag: '🇭🇹' },
+    { code: 'HN', code3: 'HND', nameEn: 'Honduras', nameId: 'Honduras', flag: '🇭🇳' },
+    { code: 'HU', code3: 'HUN', nameEn: 'Hungary', nameId: 'Hungaria', flag: '🇭🇺' },
+
+    { code: 'IS', code3: 'ISL', nameEn: 'Iceland', nameId: 'Islandia', flag: '🇮🇸' },
+    { code: 'IN', code3: 'IND', nameEn: 'India', nameId: 'India', flag: '🇮🇳' },
+    { code: 'ID', code3: 'IDN', nameEn: 'Indonesia', nameId: 'Indonesia', flag: '🇮🇩' },
+    { code: 'IR', code3: 'IRN', nameEn: 'Iran', nameId: 'Iran', flag: '🇮🇷' },
+    { code: 'IQ', code3: 'IRQ', nameEn: 'Iraq', nameId: 'Irak', flag: '🇮🇶' },
+    { code: 'IE', code3: 'IRL', nameEn: 'Ireland', nameId: 'Irlandia', flag: '🇮🇪' },
+    { code: 'IL', code3: 'ISR', nameEn: 'Israel', nameId: 'Israel', flag: '🇮🇱' },
+    { code: 'IT', code3: 'ITA', nameEn: 'Italy', nameId: 'Italia', flag: '🇮🇹' },
+
+    { code: 'JM', code3: 'JAM', nameEn: 'Jamaica', nameId: 'Jamaika', flag: '🇯🇲' },
+    { code: 'JP', code3: 'JPN', nameEn: 'Japan', nameId: 'Jepang', flag: '🇯🇵' },
+    { code: 'JO', code3: 'JOR', nameEn: 'Jordan', nameId: 'Yordania', flag: '🇯🇴' },
+
+    { code: 'KZ', code3: 'KAZ', nameEn: 'Kazakhstan', nameId: 'Kazakhstan', flag: '🇰🇿' },
+    { code: 'KE', code3: 'KEN', nameEn: 'Kenya', nameId: 'Kenya', flag: '🇰🇪' },
+    { code: 'KI', code3: 'KIR', nameEn: 'Kiribati', nameId: 'Kiribati', flag: '🇰🇮' },
+    { code: 'KW', code3: 'KWT', nameEn: 'Kuwait', nameId: 'Kuwait', flag: '🇰🇼' },
+    { code: 'KG', code3: 'KGZ', nameEn: 'Kyrgyzstan', nameId: 'Kirgizstan', flag: '🇰🇬' },
+
+    { code: 'LA', code3: 'LAO', nameEn: 'Laos', nameId: 'Laos', flag: '🇱🇦' },
+    { code: 'LV', code3: 'LVA', nameEn: 'Latvia', nameId: 'Latvia', flag: '🇱🇻' },
+    { code: 'LB', code3: 'LBN', nameEn: 'Lebanon', nameId: 'Lebanon', flag: '🇱🇧' },
+    { code: 'LS', code3: 'LSO', nameEn: 'Lesotho', nameId: 'Lesotho', flag: '🇱🇸' },
+    { code: 'LR', code3: 'LBR', nameEn: 'Liberia', nameId: 'Liberia', flag: '🇱🇷' },
+    { code: 'LY', code3: 'LBY', nameEn: 'Libya', nameId: 'Libya', flag: '🇱🇾' },
+    { code: 'LI', code3: 'LIE', nameEn: 'Liechtenstein', nameId: 'Liechtenstein', flag: '🇱🇮' },
+    { code: 'LT', code3: 'LTU', nameEn: 'Lithuania', nameId: 'Lithuania', flag: '🇱🇹' },
+    { code: 'LU', code3: 'LUX', nameEn: 'Luxembourg', nameId: 'Luksemburg', flag: '🇱🇺' },
+
+    { code: 'MG', code3: 'MDG', nameEn: 'Madagascar', nameId: 'Madagaskar', flag: '🇲🇬' },
+    { code: 'MW', code3: 'MWI', nameEn: 'Malawi', nameId: 'Malawi', flag: '🇲🇼' },
+    { code: 'MY', code3: 'MYS', nameEn: 'Malaysia', nameId: 'Malaysia', flag: '🇲🇾' },
+    { code: 'MV', code3: 'MDV', nameEn: 'Maldives', nameId: 'Maladewa', flag: '🇲🇻' },
+    { code: 'ML', code3: 'MLI', nameEn: 'Mali', nameId: 'Mali', flag: '🇲🇱' },
+    { code: 'MT', code3: 'MLT', nameEn: 'Malta', nameId: 'Malta', flag: '🇲🇹' },
+    { code: 'MH', code3: 'MHL', nameEn: 'Marshall Islands', nameId: 'Kepulauan Marshall', flag: '🇲🇭' },
+    { code: 'MR', code3: 'MRT', nameEn: 'Mauritania', nameId: 'Mauritania', flag: '🇲🇷' },
+    { code: 'MU', code3: 'MUS', nameEn: 'Mauritius', nameId: 'Mauritius', flag: '🇲🇺' },
+    { code: 'MX', code3: 'MEX', nameEn: 'Mexico', nameId: 'Meksiko', flag: '🇲🇽' },
+    { code: 'FM', code3: 'FSM', nameEn: 'Micronesia', nameId: 'Mikronesia', flag: '🇫🇲' },
+    { code: 'MD', code3: 'MDA', nameEn: 'Moldova', nameId: 'Moldova', flag: '🇲🇩' },
+    { code: 'MC', code3: 'MCO', nameEn: 'Monaco', nameId: 'Monako', flag: '🇲🇨' },
+    { code: 'MN', code3: 'MNG', nameEn: 'Mongolia', nameId: 'Mongolia', flag: '🇲🇳' },
+    { code: 'ME', code3: 'MNE', nameEn: 'Montenegro', nameId: 'Montenegro', flag: '🇲🇪' },
+    { code: 'MA', code3: 'MAR', nameEn: 'Morocco', nameId: 'Maroko', flag: '🇲🇦' },
+    { code: 'MZ', code3: 'MOZ', nameEn: 'Mozambique', nameId: 'Mozambik', flag: '🇲🇿' },
+    { code: 'MM', code3: 'MMR', nameEn: 'Myanmar', nameId: 'Myanmar', flag: '🇲🇲' },
+
+    { code: 'NA', code3: 'NAM', nameEn: 'Namibia', nameId: 'Namibia', flag: '🇳🇦' },
+    { code: 'NR', code3: 'NRU', nameEn: 'Nauru', nameId: 'Nauru', flag: '🇳🇷' },
+    { code: 'NP', code3: 'NPL', nameEn: 'Nepal', nameId: 'Nepal', flag: '🇳🇵' },
+    { code: 'NL', code3: 'NLD', nameEn: 'Netherlands', nameId: 'Belanda', flag: '🇳🇱' },
+    { code: 'NZ', code3: 'NZL', nameEn: 'New Zealand', nameId: 'Selandia Baru', flag: '🇳🇿' },
+    { code: 'NI', code3: 'NIC', nameEn: 'Nicaragua', nameId: 'Nikaragua', flag: '🇳🇮' },
+    { code: 'NE', code3: 'NER', nameEn: 'Niger', nameId: 'Niger', flag: '🇳🇪' },
+    { code: 'NG', code3: 'NGA', nameEn: 'Nigeria', nameId: 'Nigeria', flag: '🇳🇬' },
+    { code: 'KP', code3: 'PRK', nameEn: 'North Korea', nameId: 'Korea Utara', flag: '🇰🇵' },
+    { code: 'MK', code3: 'MKD', nameEn: 'North Macedonia', nameId: 'Makedonia Utara', flag: '🇲🇰' },
+    { code: 'NO', code3: 'NOR', nameEn: 'Norway', nameId: 'Norwegia', flag: '🇳🇴' },
+
+    { code: 'OM', code3: 'OMN', nameEn: 'Oman', nameId: 'Oman', flag: '🇴🇲' },
+
+    { code: 'PK', code3: 'PAK', nameEn: 'Pakistan', nameId: 'Pakistan', flag: '🇵🇰' },
+    { code: 'PW', code3: 'PLW', nameEn: 'Palau', nameId: 'Palau', flag: '🇵🇼' },
+    { code: 'PS', code3: 'PSE', nameEn: 'Palestine', nameId: 'Palestina', flag: '🇵🇸' },
+    { code: 'PA', code3: 'PAN', nameEn: 'Panama', nameId: 'Panama', flag: '🇵🇦' },
+    { code: 'PG', code3: 'PNG', nameEn: 'Papua New Guinea', nameId: 'Papua Nugini', flag: '🇵🇬' },
+    { code: 'PY', code3: 'PRY', nameEn: 'Paraguay', nameId: 'Paraguay', flag: '🇵🇾' },
+    { code: 'PE', code3: 'PER', nameEn: 'Peru', nameId: 'Peru', flag: '🇵🇪' },
+    { code: 'PH', code3: 'PHL', nameEn: 'Philippines', nameId: 'Filipina', flag: '🇵🇭' },
+    { code: 'PL', code3: 'POL', nameEn: 'Poland', nameId: 'Polandia', flag: '🇵🇱' },
+    { code: 'PT', code3: 'PRT', nameEn: 'Portugal', nameId: 'Portugal', flag: '🇵🇹' },
+
+    { code: 'QA', code3: 'QAT', nameEn: 'Qatar', nameId: 'Qatar', flag: '🇶🇦' },
+
+    { code: 'RO', code3: 'ROU', nameEn: 'Romania', nameId: 'Rumania', flag: '🇷🇴' },
+    { code: 'RU', code3: 'RUS', nameEn: 'Russia', nameId: 'Rusia', flag: '🇷🇺' },
+    { code: 'RW', code3: 'RWA', nameEn: 'Rwanda', nameId: 'Rwanda', flag: '🇷🇼' },
+
+    { code: 'KN', code3: 'KNA', nameEn: 'Saint Kitts and Nevis', nameId: 'Saint Kitts dan Nevis', flag: '🇰🇳' },
+    { code: 'LC', code3: 'LCA', nameEn: 'Saint Lucia', nameId: 'Saint Lucia', flag: '🇱🇨' },
+    { code: 'VC', code3: 'VCT', nameEn: 'Saint Vincent and the Grenadines', nameId: 'Saint Vincent dan Grenadines', flag: '🇻🇨' },
+    { code: 'WS', code3: 'WSM', nameEn: 'Samoa', nameId: 'Samoa', flag: '🇼🇸' },
+    { code: 'SM', code3: 'SMR', nameEn: 'San Marino', nameId: 'San Marino', flag: '🇸🇲' },
+    { code: 'ST', code3: 'STP', nameEn: 'Sao Tome and Principe', nameId: 'Sao Tome dan Principe', flag: '🇸🇹' },
+    { code: 'SA', code3: 'SAU', nameEn: 'Saudi Arabia', nameId: 'Arab Saudi', flag: '🇸🇦' },
+    { code: 'SN', code3: 'SEN', nameEn: 'Senegal', nameId: 'Senegal', flag: '🇸🇳' },
+    { code: 'RS', code3: 'SRB', nameEn: 'Serbia', nameId: 'Serbia', flag: '🇷🇸' },
+    { code: 'SC', code3: 'SYC', nameEn: 'Seychelles', nameId: 'Seychelles', flag: '🇸🇨' },
+    { code: 'SL', code3: 'SLE', nameEn: 'Sierra Leone', nameId: 'Sierra Leone', flag: '🇸🇱' },
+    { code: 'SG', code3: 'SGP', nameEn: 'Singapore', nameId: 'Singapura', flag: '🇸🇬' },
+    { code: 'SK', code3: 'SVK', nameEn: 'Slovakia', nameId: 'Slovakia', flag: '🇸🇰' },
+    { code: 'SI', code3: 'SVN', nameEn: 'Slovenia', nameId: 'Slovenia', flag: '🇸🇮' },
+    { code: 'SB', code3: 'SLB', nameEn: 'Solomon Islands', nameId: 'Kepulauan Solomon', flag: '🇸🇧' },
+    { code: 'SO', code3: 'SOM', nameEn: 'Somalia', nameId: 'Somalia', flag: '🇸🇴' },
+    { code: 'ZA', code3: 'ZAF', nameEn: 'South Africa', nameId: 'Afrika Selatan', flag: '🇿🇦' },
+    { code: 'KR', code3: 'KOR', nameEn: 'South Korea', nameId: 'Korea Selatan', flag: '🇰🇷' },
+    { code: 'SS', code3: 'SSD', nameEn: 'South Sudan', nameId: 'Sudan Selatan', flag: '🇸🇸' },
+    { code: 'ES', code3: 'ESP', nameEn: 'Spain', nameId: 'Spanyol', flag: '🇪🇸' },
+    { code: 'LK', code3: 'LKA', nameEn: 'Sri Lanka', nameId: 'Sri Lanka', flag: '🇱🇰' },
+    { code: 'SD', code3: 'SDN', nameEn: 'Sudan', nameId: 'Sudan', flag: '🇸🇩' },
+    { code: 'SR', code3: 'SUR', nameEn: 'Suriname', nameId: 'Suriname', flag: '🇸🇷' },
+    { code: 'SE', code3: 'SWE', nameEn: 'Sweden', nameId: 'Swedia', flag: '🇸🇪' },
+    { code: 'CH', code3: 'CHE', nameEn: 'Switzerland', nameId: 'Swiss', flag: '🇨🇭' },
+    { code: 'SY', code3: 'SYR', nameEn: 'Syria', nameId: 'Suriah', flag: '🇸🇾' },
+
+    { code: 'TW', code3: 'TWN', nameEn: 'Taiwan', nameId: 'Taiwan', flag: '🇹🇼' },
+    { code: 'TJ', code3: 'TJK', nameEn: 'Tajikistan', nameId: 'Tajikistan', flag: '🇹🇯' },
+    { code: 'TZ', code3: 'TZA', nameEn: 'Tanzania', nameId: 'Tanzania', flag: '🇹🇿' },
+    { code: 'TH', code3: 'THA', nameEn: 'Thailand', nameId: 'Thailand', flag: '🇹🇭' },
+    { code: 'TL', code3: 'TLS', nameEn: 'Timor-Leste', nameId: 'Timor Leste', flag: '🇹🇱' },
+    { code: 'TG', code3: 'TGO', nameEn: 'Togo', nameId: 'Togo', flag: '🇹🇬' },
+    { code: 'TO', code3: 'TON', nameEn: 'Tonga', nameId: 'Tonga', flag: '🇹🇴' },
+    { code: 'TT', code3: 'TTO', nameEn: 'Trinidad and Tobago', nameId: 'Trinidad dan Tobago', flag: '🇹🇹' },
+    { code: 'TN', code3: 'TUN', nameEn: 'Tunisia', nameId: 'Tunisia', flag: '🇹🇳' },
+    { code: 'TR', code3: 'TUR', nameEn: 'Turkey', nameId: 'Turki', flag: '🇹🇷' },
+    { code: 'TM', code3: 'TKM', nameEn: 'Turkmenistan', nameId: 'Turkmenistan', flag: '🇹🇲' },
+    { code: 'TV', code3: 'TUV', nameEn: 'Tuvalu', nameId: 'Tuvalu', flag: '🇹🇻' },
+
+    { code: 'UG', code3: 'UGA', nameEn: 'Uganda', nameId: 'Uganda', flag: '🇺🇬' },
+    { code: 'UA', code3: 'UKR', nameEn: 'Ukraine', nameId: 'Ukraina', flag: '🇺🇦' },
+    { code: 'AE', code3: 'ARE', nameEn: 'United Arab Emirates', nameId: 'Uni Emirat Arab', flag: '🇦🇪' },
+    { code: 'GB', code3: 'GBR', nameEn: 'United Kingdom', nameId: 'Inggris Raya', flag: '🇬🇧' },
+    { code: 'US', code3: 'USA', nameEn: 'United States', nameId: 'Amerika Serikat', flag: '🇺🇸' },
+    { code: 'UY', code3: 'URY', nameEn: 'Uruguay', nameId: 'Uruguay', flag: '🇺🇾' },
+    { code: 'UZ', code3: 'UZB', nameEn: 'Uzbekistan', nameId: 'Uzbekistan', flag: '🇺🇿' },
+
+    { code: 'VU', code3: 'VUT', nameEn: 'Vanuatu', nameId: 'Vanuatu', flag: '🇻🇺' },
+    { code: 'VA', code3: 'VAT', nameEn: 'Vatican City', nameId: 'Vatikan', flag: '🇻🇦' },
+    { code: 'VE', code3: 'VEN', nameEn: 'Venezuela', nameId: 'Venezuela', flag: '🇻🇪' },
+    { code: 'VN', code3: 'VNM', nameEn: 'Vietnam', nameId: 'Vietnam', flag: '🇻🇳' },
+
+    { code: 'YE', code3: 'YEM', nameEn: 'Yemen', nameId: 'Yaman', flag: '🇾🇪' },
+
+    { code: 'ZM', code3: 'ZMB', nameEn: 'Zambia', nameId: 'Zambia', flag: '🇿🇲' },
+    { code: 'ZW', code3: 'ZWE', nameEn: 'Zimbabwe', nameId: 'Zimbabwe', flag: '🇿🇼' },
+  ];
+
+  let rowCount = 0;
+
+  function addQueryRow() {
+    rowCount++;
+    const template = document.getElementById('queryRowTemplate');
+    const clone = template.content.cloneNode(true);
+    const rowsContainer = document.getElementById('rowsContainer');
+
+    const queryRow = clone.querySelector('.query-row');
+    queryRow.querySelector('.query-row-number').textContent = rowCount;
+
+    // Associate labels with inputs for accessibility
+    const nameLabel = queryRow.querySelector('.form-label');
+    const nameInput = queryRow.querySelector('.query-name');
+    const nameId = `query-name-${rowCount}`;
+    nameInput.id = nameId;
+    nameLabel.setAttribute('for', nameId);
+
+    const dobLabel = queryRow.querySelectorAll('.form-label')[1];
+    const dobInput = queryRow.querySelector('.query-dob');
+    const dobId = `query-dob-${rowCount}`;
+    dobInput.id = dobId;
+    dobLabel.setAttribute('for', dobId);
+
+    const citizenshipLabel = queryRow.querySelectorAll('.form-label')[2];
+    const citizenshipInput = queryRow.querySelector('.query-citizenship');
+    const citizenshipId = `query-citizenship-${rowCount}`;
+    citizenshipInput.id = citizenshipId;
+    citizenshipLabel.setAttribute('for', citizenshipId);
+
+    const selectWrapper = queryRow.querySelector('.searchable-select-wrapper');
+    const selectInput = selectWrapper.querySelector('.searchable-select-input');
+    const dropdown = selectWrapper.querySelector('.searchable-select-dropdown');
+    const clearBtn = selectWrapper.querySelector('.select-clear-btn');
+
+    // Generate dropdown options with bilingual support
+    renderCountryOptions(dropdown, COUNTRIES);
+
+    selectInput.addEventListener('focus', function() {
+      dropdown.classList.add('show');
+    });
+
+    selectInput.addEventListener('input', function(e) {
+      const searchTerm = e.target.value.toLowerCase().trim();
+      const filtered = COUNTRIES.filter(country => 
+        country.nameId.toLowerCase().includes(searchTerm) ||
+        country.nameEn.toLowerCase().includes(searchTerm) ||
+        country.code.toLowerCase().includes(searchTerm) ||
+        country.code3.toLowerCase().includes(searchTerm)
+      );
+      renderCountryOptions(dropdown, filtered);
+      dropdown.classList.add('show');
+      
+      // Show/hide clear button
+      clearBtn.classList.toggle('show', e.target.value.length > 0);
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!selectWrapper.contains(e.target)) {
+        dropdown.classList.remove('show');
+      }
+    });
+
+    rowsContainer.appendChild(clone);
+    updateRemoveButtons();
+  }
+
+  function renderCountryOptions(dropdown, countries) {
+    if (countries.length === 0) {
+      dropdown.innerHTML = '<div class="searchable-select-empty">Negara tidak ditemukan</div>';
+      return;
+    }
+
+    dropdown.innerHTML = countries.map(country => `
+      <div class="searchable-select-option" 
+           data-code="${country.code}" 
+           data-name-id="${country.nameId}"
+           data-name-en="${country.nameEn}"
+           data-code3="${country.code3}">
+        <span class="country-flag">${country.flag}</span>
+        <div class="country-info">
+          <span class="country-name">${country.nameId}</span>
+          <span class="country-code">${country.code} / ${country.code3}</span>
+        </div>
+      </div>
+    `).join('');
+
+    // Add click handlers to options
+    dropdown.querySelectorAll('.searchable-select-option').forEach(option => {
+      option.addEventListener('click', function() {
+        const wrapper = this.closest('.searchable-select-wrapper');
+        const input = wrapper.querySelector('.searchable-select-input');
+        const clearBtn = wrapper.querySelector('.select-clear-btn');
+        const dropdownEl = wrapper.querySelector('.searchable-select-dropdown');
+        
+        const nameId = this.dataset.nameId;
+        const code = this.dataset.code;
+        
+        input.value = nameId;
+        input.dataset.selectedCode = code;
+        dropdownEl.classList.remove('show');
+        clearBtn.classList.add('show');
+      });
+    });
+  }
+
+  function clearSelection(btn) {
+    const wrapper = btn.closest('.searchable-select-wrapper');
+    const input = wrapper.querySelector('.searchable-select-input');
+    input.value = '';
+    delete input.dataset.selectedCode;
+    btn.classList.remove('show');
+    input.focus();
+  }
+
+  function removeQueryRow(btn) {
+    const row = btn.closest('.query-row');
+    row.remove();
+    updateRemoveButtons();
+    updateRowNumbers();
+  }
+
+  function updateRemoveButtons() {
+    const rows = document.querySelectorAll('.query-row');
+    const removeButtons = document.querySelectorAll('.btn-remove');
+    removeButtons.forEach(btn => {
+      btn.style.display = rows.length > 1 ? 'block' : 'none';
+    });
+  }
+
+  function updateRowNumbers() {
+    const rows = document.querySelectorAll('.query-row');
+    rows.forEach((row, index) => {
+      row.querySelector('.query-row-number').textContent = index + 1;
+    });
+    rowCount = rows.length;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    addQueryRow();
+
+    // Advanced toggle
+    const form = document.getElementById('bulkSearchForm');
+    const toggleBtn = document.getElementById('toggleAdvancedBtn');
+    const panel = document.getElementById('advancedPanel');
+
+    function setAdvanced(open) {
+      if (!form) return;
+      form.classList.toggle('advanced-open', !!open);
+      if (toggleBtn) toggleBtn.textContent = open ? 'Sembunyikan Pengaturan ▴' : 'Pengaturan ▾';
+      if (panel) panel.style.display = open ? 'block' : 'none';
+
+      // Keep threshold displays in sync when panel is opened.
+      if (open) {
+        const nameEl = document.getElementById('bulkNameThreshold');
+        const finalEl = document.getElementById('bulkFinalThreshold');
+        if (nameEl) updateThresholdDisplay(nameEl.value, 'bulkNameThresholdDisplay');
+        if (finalEl) updateThresholdDisplay(finalEl.value, 'bulkFinalThresholdDisplay');
+      }
+    }
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const isOpen = !!(form && form.classList.contains('advanced-open'));
+        setAdvanced(!isOpen);
+      });
+    }
+    setAdvanced(false);
+
+    // Sanction checkbox behavior (ALL is default, but selectable sources override ALL)
+    const allBox = document.getElementById('bulk_src_all');
+    const itemBoxes = Array.from(document.querySelectorAll('#bulkSanctionCheckboxes .bulk-src-item'));
+
+    function normalizeSanctionSelection() {
+      const selectedItems = itemBoxes.filter(cb => cb.checked).map(cb => String(cb.value || '').trim()).filter(Boolean);
+      if (selectedItems.length > 0) {
+        if (allBox) allBox.checked = false;
+      } else {
+        if (allBox) allBox.checked = true;
+      }
+    }
+
+    if (allBox) {
+      allBox.addEventListener('change', () => {
+        if (allBox.checked) {
+          // If ALL chosen, clear specific choices.
+          for (const cb of itemBoxes) cb.checked = false;
+        }
+        normalizeSanctionSelection();
+      });
+    }
+    for (const cb of itemBoxes) {
+      cb.addEventListener('change', () => {
+        normalizeSanctionSelection();
+      });
+    }
+    normalizeSanctionSelection();
+  });
+</script>
+
+<script>
+  // Submit handler updated for loading state and new displayResults
+  document.getElementById('bulkSearchForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const nameThresholdEl = document.getElementById('bulkNameThreshold');
+    const finalThresholdEl = document.getElementById('bulkFinalThreshold');
+
+    const nameThreshold = Number(nameThresholdEl?.value || 70);
+    const finalThreshold = Number(finalThresholdEl?.value || 60);
+
+    // Collect sanction sources from checkboxes.
+    const allBox = document.getElementById('bulk_src_all');
+    const itemBoxes = Array.from(document.querySelectorAll('#bulkSanctionCheckboxes .bulk-src-item'));
+    const selectedItems = itemBoxes.filter(cb => cb.checked).map(cb => String(cb.value || '').trim()).filter(Boolean);
+    const sanctionSources = selectedItems.length ? selectedItems : ['ALL'];
+    if (allBox && allBox.checked && selectedItems.length) {
+      // Defensive: ignore ALL if user picked specifics.
+    }
+
+    const rows = document.querySelectorAll('.query-row');
+    const queries = [];
+
+    rows.forEach(row => {
+      const name = row.querySelector('.query-name').value.trim();
+      const dob = row.querySelector('.query-dob').value;
+      const citizenshipInput = row.querySelector('.query-citizenship');
+      const citizenship = citizenshipInput.dataset.selectedCode || '';
+
+      if (!name) return;
+
+      const query = { name };
+      if (dob) query.date_of_birth = dob;
+      if (citizenship) query.citizenship = citizenship;
+
+      queries.push(query);
+    });
+
+    if (queries.length === 0) {
+      alert('Harap masukkan minimal satu nama nasabah!');
+      return;
+    }
+
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingState = document.getElementById('loadingState');
+    submitBtn.disabled = true;
+    loadingState.classList.add('show');
+
+    try {
+      const response = await fetch('/api/screening/quick-search-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queries,
+          threshold_name_score: nameThreshold,
+          threshold_score: finalThreshold,
+          sanction_sources: sanctionSources
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Terjadi kesalahan saat screening');
+      }
+
+      displayResults(data);
+
+    } catch (error) {
+      console.error('[v0] Error submitting search:', error);
+      alert('Gagal melakukan screening: ' + error.message);
+    } finally {
+      submitBtn.disabled = false;
+      loadingState.classList.remove('show');
+    }
+  });
+
+  let allResults = [];
+  let selectedCardIndex = 0;
+
+  function displayResults(data) {
+    const resultsContainer = document.getElementById('resultsContainer');
+    const nameCardsContainer = document.getElementById('nameCardsContainer');
+    const resultsTableContainer = document.getElementById('resultsTableContainer');
+    const resultsInfo = document.getElementById('resultsInfo');
+
+    // Clear previous results
+    nameCardsContainer.innerHTML = '';
+    resultsTableContainer.innerHTML = '';
+    resultsContainer.style.display = 'block';
+
+    if (!data || !data.results) {
+      resultsInfo.innerHTML = 'Tidak ada hasil yang diterima.';
+      return;
+    }
+
+    const { results } = data;
+    allResults = results;
+    
+    let totalMatches = 0;
+    results.forEach(r => totalMatches += (r.match_count || 0));
+    resultsInfo.innerHTML = `Diproses <strong>${results.length}</strong> nasabah, ditemukan <strong>${totalMatches}</strong> matches.`;
+
+    // Generate horizontal cards for each query
+    results.forEach((result, index) => {
+      const queryName = result.query_data?.name || 'Unknown';
+      const matchCount = result.match_count || 0;
+
+      const card = document.createElement('div');
+      card.className = `name-card ${index === 0 ? 'active' : ''}`;
+      card.onclick = () => selectCard(index);
+      card.innerHTML = `
+        <div class="name-card-name">${queryName}</div>
+        <div class="name-card-matches">${matchCount} matches</div>
+      `;
+      nameCardsContainer.appendChild(card);
+    });
+
+    // Display table for first card
+    displayTableForCard(0);
+  }
+
+  function selectCard(index) {
+    selectedCardIndex = index;
+    
+    // Update active state
+    const cards = document.querySelectorAll('.name-card');
+    cards.forEach((card, i) => {
+      card.classList.toggle('active', i === index);
+    });
+
+    // Display table for selected card
+    displayTableForCard(index);
+  }
+
+  function getScoreClass(score) {
+    if (score >= 80) return 'score-high';
+    if (score >= 60) return 'score-medium';
+    return 'score-low';
+  }
+
+  function displayTableForCard(index) {
+    const resultsTableContainer = document.getElementById('resultsTableContainer');
+    const result = allResults[index];
+
+    if (!result) return;
+
+    const matchCount = result.match_count || 0;
+
+    if (matchCount === 0) {
+      resultsTableContainer.innerHTML = `
+        <div style="text-align: center; padding: 3rem; color: var(--text-light);">
+          <div style="font-size: 3rem; margin-bottom: 1rem;">✓</div>
+          <div style="font-size: 1.1rem; font-weight: 500; color: var(--text-primary);">Aman (No Match)</div>
+        </div>
+      `;
+      return;
+    }
+
+    let html = `
+      <div class="results-table-container">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">#</th>
+              <th>Nama (Sanction)</th>
+              <th style="width: 130px;">Skor Nama</th>
+              <th style="width: 150px;">Skor Akhir</th>
+              <th style="width: 100px;"></th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+    result.matches.forEach((match, idx) => {
+      const nameScore = (match.name_score || 0).toFixed(1);
+      const finalScore = (match.final_score || 0).toFixed(1);
+      const nameScoreClass = getScoreClass(match.name_score || 0);
+      const finalScoreClass = getScoreClass(match.final_score || 0);
+      
+      const hasGeoInsights = match.geographic_insights && match.geographic_insights.length > 0;
+      
+      html += `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>
+            <span class="entity-name">${match.sanction_name}</span>
+            <div class="entity-meta">ID: ${match.sanction_id} | ${match.sanction_source || '-'}</div>
+          </td>
+          <td>
+            <span class="score-badge ${nameScoreClass}">${nameScore}%</span>
+          </td>
+          <td class="score-cell">
+            <span class="score-badge ${finalScoreClass}">${finalScore}%</span>
+            <button class="score-breakdown-btn" onclick="toggleScoreBreakdown(event, 'score-${index}-${idx}')">
+              <span class="arrow-icon">▼</span> Rincian
+            </button>
+            <div class="score-breakdown-section" id="score-${index}-${idx}">
+              <div class="score-breakdown-content">
+                <div class="score-breakdown-item">
+                  <span class="score-breakdown-label">Skor Nama</span>
+                  <span class="score-breakdown-value">${nameScore}%</span>
+                </div>
+                ${match.dob_score !== null && match.dob_score !== undefined ? `
+                <div class="score-breakdown-item">
+                  <span class="score-breakdown-label">Skor Tanggal Lahir</span>
+                  <span class="score-breakdown-value">${(match.dob_score || 0).toFixed(1)}%</span>
+                </div>` : ''}
+                ${match.citizenship_score !== null && match.citizenship_score !== undefined ? `
+                <div class="score-breakdown-item">
+                  <span class="score-breakdown-label">Skor Kewarganegaraan</span>
+                  <span class="score-breakdown-value">${(match.citizenship_score || 0).toFixed(1)}%</span>
+                </div>` : ''}
+                <div class="score-breakdown-item" style="border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.25rem;">
+                  <span class="score-breakdown-label" style="font-weight: 600;">Skor Akhir</span>
+                  <span class="score-breakdown-value" style="font-size: 1.05em; color: var(--primary-accent);">${finalScore}%</span>
+                </div>
+              </div>
+            </div>
+          </td>
+          <td style="text-align: right;">
+            ${hasGeoInsights ? 
+              `<button class="geo-collapsible-btn" onclick="toggleGeoProfile(this, '${result.request_id}-${idx}')"><span class="arrow-icon">▼</span> Details</button>` 
+              : '<span style="font-size: 0.8rem; color: var(--text-light);">—</span>'}
+          </td>
+        </tr>`;
+        
+      if (hasGeoInsights) {
+        html += `
+        <tr style="display: none;" class="geo-profile-row-${result.request_id}-${idx}">
+          <td colspan="5" style="padding: 0; border: none;">
+            <div class="geo-profiling-section" id="geo-profile-${result.request_id}-${idx}">
+              <div class="geo-profiling-content">`;
+              
+        const queryData = result.query_data || {};
+        const userCitizenship = queryData.citizenship || '?';
+
+        if (match.sanction_citizenship) {
+          html += `
+                <div class="geo-item">
+                  <div class="geo-item-icon">📍</div>
+                  <div class="geo-item-content">
+                    <div class="geo-item-label">Registrasi Kewarganegaraan</div>
+                    <div class="geo-item-value">${userCitizenship} <span style="color: var(--text-light); margin: 0 0.5rem;">→</span> ${match.sanction_citizenship}</div>
+                  </div>
+                </div>`;
+        }
+        
+        html += `
+                <div class="geo-insights-box">
+                  <strong>⚠️ Geographic Insights</strong>
+                  <ul class="geo-insights-list">
+                    ${match.geographic_insights.map(insight => {
+                      const cleanInsight = insight.replace(/^⚠️\s*/, '');
+                      return `<li>${cleanInsight}</li>`;
+                    }).join('')}
+                  </ul>
+                </div>
+                <div class="geo-item">
+                  <div class="geo-item-icon">🏛️</div>
+                  <div class="geo-item-content">
+                    <div class="geo-item-label">Scheme</div>
+                    <div class="geo-item-value">${match.scheme || 'N/A'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+      }
+    });
+    
+    html += `
+          </tbody>
+        </table>
+      </div>`;
+    
+    resultsTableContainer.innerHTML = html;
+  }
+
+  function toggleScoreBreakdown(event, breakdownId) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const button = event.currentTarget;
+    const breakdown = document.getElementById(breakdownId);
+    
+    if (!breakdown) return;
+    
+    const isExpanded = button.classList.contains('expanded');
+    
+    if (isExpanded) {
+      button.classList.remove('expanded');
+      breakdown.classList.remove('expanded');
+    } else {
+      button.classList.add('expanded');
+      breakdown.classList.add('expanded');
+    }
+  }
+
+  function toggleGeoProfile(button, matchId) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const geoRow = document.querySelector(`.geo-profile-row-${matchId}`);
+    const geoProfile = document.getElementById(`geo-profile-${matchId}`);
+    
+    if (!geoRow || !geoProfile) {
+      console.log('[v0] Geo profile elements not found:', matchId);
+      return;
+    }
+    
+    const isExpanded = button.classList.contains('expanded');
+    
+    if (isExpanded) {
+      button.classList.remove('expanded');
+      geoProfile.classList.remove('expanded');
+      setTimeout(() => {
+        geoRow.style.display = 'none';
+      }, 300);
+    } else {
+      geoRow.style.display = 'table-row';
+      setTimeout(() => {
+        geoProfile.classList.add('expanded');
+        button.classList.add('expanded');
+      }, 10);
+    }
+  }
+
+  function updateThresholdDisplay(value, displayId) {
+    const v = Math.max(0, Math.min(100, Number(value || 0)));
+    const el = document.getElementById(displayId);
+    if (el) el.textContent = `${Math.round(v)}%`;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const nameEl = document.getElementById('bulkNameThreshold');
+    const finalEl = document.getElementById('bulkFinalThreshold');
+    if (nameEl) {
+      updateThresholdDisplay(nameEl.value, 'bulkNameThresholdDisplay');
+      nameEl.addEventListener('input', () => updateThresholdDisplay(nameEl.value, 'bulkNameThresholdDisplay'));
+    }
+    if (finalEl) {
+      updateThresholdDisplay(finalEl.value, 'bulkFinalThresholdDisplay');
+      finalEl.addEventListener('input', () => updateThresholdDisplay(finalEl.value, 'bulkFinalThresholdDisplay'));
+    }
+  });
+</script>
+
+</main>
+
+<script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+></script>
+
+
+</body>
+</html>

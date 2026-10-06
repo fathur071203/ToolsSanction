@@ -1,0 +1,1720 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SLIS - Sanction List Screening System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap 5 CDN -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+    crossorigin="anonymous"
+  >
+
+  <!-- Google Fonts for modern typography -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* Complete redesign: modern color system, typography, and layout */
+    :root {
+      --primary: #0f172a;
+      --primary-light: #1e293b;
+      --primary-accent: #0ea5e9;
+      --secondary: #6366f1;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --background: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --text-light: #94a3b8;
+
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.10);
+      --shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.16);
+      --ring: 0 0 0 3px rgba(14, 165, 233, 0.18);
+    }
+
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    body {
+      --app-bg-opacity: 0.24;
+      --app-bg-blur: 3px;
+      --app-particles-opacity: 0.18;
+      background-color: var(--background);
+      position: relative;
+      isolation: isolate;
+      color: var(--text-primary);
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
+
+    /* App background (all pages): blurred image + soft gradient */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(135deg, rgba(2, 6, 23, 0.44) 0%, rgba(2, 6, 23, 0.10) 45%, rgba(2, 6, 23, 0.32) 100%),
+        url("static/bgutama.png");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: var(--app-bg-opacity);
+      filter: blur(var(--app-bg-blur)) saturate(1.08) contrast(1.02);
+      transform: scale(1.04);
+      z-index: -2;
+      pointer-events: none;
+    }
+
+    /* Subtle particle overlay (all pages) */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: -20vh -20vw;
+      z-index: -1;
+      pointer-events: none;
+      opacity: var(--app-particles-opacity);
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.30) 0 1px, transparent 2px),
+        radial-gradient(circle at 30% 80%, rgba(255, 255, 255, 0.22) 0 1px, transparent 2px),
+        radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.18) 0 1px, transparent 2px),
+        radial-gradient(circle at 85% 65%, rgba(255, 255, 255, 0.20) 0 1px, transparent 2px),
+        radial-gradient(circle at 55% 15%, rgba(255, 255, 255, 0.14) 0 1px, transparent 2px),
+        radial-gradient(circle at 45% 55%, rgba(255, 255, 255, 0.16) 0 1px, transparent 2px);
+      background-size: 220px 220px, 260px 260px, 240px 240px, 300px 300px, 280px 280px, 320px 320px;
+      background-repeat: repeat;
+      filter: blur(0.2px);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      body::after {
+        animation: particleDrift 22s linear infinite;
+      }
+      @keyframes particleDrift {
+        0% { transform: translate3d(0, 0, 0); }
+        100% { transform: translate3d(80px, -60px, 0); }
+      }
+    }
+
+    a { transition: color 0.2s ease, opacity 0.2s ease; }
+
+    /* Gentle page entrance */
+    @media (prefers-reduced-motion: no-preference) {
+      main.container { animation: fadeUp 420ms ease both; }
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    }
+
+    /* Home modifier (optional): slightly stronger background */
+    body.home-bg {
+      --app-bg-opacity: 0.28;
+      --app-particles-opacity: 0.22;
+    }
+
+    /* Navbar Styling */
+    .navbar {
+      background:
+        linear-gradient(90deg, rgba(0, 85, 150, 0.94) 0%, rgba(11, 107, 181, 0.92) 55%, rgba(0, 85, 150, 0.94) 100%);
+      padding: 0.75rem 0;
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.18);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 1030;
+    }
+
+    .navbar .container-fluid {
+      max-width: 1200px;
+      padding-left: 1.25rem;
+      padding-right: 1.25rem;
+    }
+
+    .navbar-brand {
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: rgba(255, 255, 255, 0.96) !important;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.25rem 0;
+    }
+
+    .navbar-brand:hover {
+      opacity: 0.92;
+    }
+
+    .navbar-logo {
+      width: clamp(72px, 6vw, 112px);
+      height: auto;
+      max-height: 96px;
+      object-fit: contain;
+    }
+
+    .nav-link {
+      color: rgba(255, 255, 255, 0.86) !important;
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 0.55rem 0.9rem !important;
+      border-radius: 999px;
+      transition: all 0.2s ease;
+      position: relative;
+      line-height: 1.1;
+    }
+
+    .nav-link:hover {
+      background-color: rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.98) !important;
+    }
+
+    .nav-link.active {
+      background-color: rgba(255, 255, 255, 0.20);
+      color: rgba(255, 255, 255, 0.98) !important;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      display: none;
+    }
+
+    .navbar-toggler {
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 10px;
+      padding: 0.45rem 0.6rem;
+      box-shadow: 0 6px 18px rgba(2, 6, 23, 0.14);
+    }
+
+    .navbar-toggler:focus {
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+    }
+
+    @media (max-width: 991.98px) {
+      .navbar .navbar-nav {
+        padding-top: 0.5rem;
+        gap: 0.25rem;
+      }
+      .nav-link {
+        border-radius: 10px;
+      }
+    }
+
+    /* Main Container */
+    main.container {
+      max-width: 1200px;
+      padding: 1.5rem;
+    }
+
+    /* Glass utility (optional) */
+    .glass {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* Alerts */
+    .alert {
+      border-radius: 8px;
+      border: none;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .alert-success {
+      background-color: #ecfdf5;
+      color: #065f46;
+    }
+
+    .alert-danger {
+      background-color: #fef2f2;
+      color: #7f1d1d;
+    }
+
+    .alert-warning {
+      background-color: #fffbeb;
+      color: #78350f;
+    }
+
+    .alert-info {
+      background-color: #f0f9ff;
+      color: #0c2d6b;
+    }
+
+    /* Button Styles */
+    .btn {
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 0.6rem 1.2rem;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .btn-sm {
+      padding: 0.45rem 0.85rem;
+      font-size: 0.85rem;
+      border-radius: 10px;
+    }
+
+    .btn:focus-visible {
+      outline: none;
+      box-shadow: var(--ring);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary-accent), #38bdf8);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #0284c7;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, var(--secondary), #8b5cf6);
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background-color: #4f46e5;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, var(--success), #22c55e);
+      color: white;
+    }
+
+    .btn-success:hover {
+      background-color: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-warning {
+      background: linear-gradient(135deg, var(--warning), #fb923c);
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background-color: #d97706;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-lg {
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+    }
+
+    .btn-link {
+      color: var(--primary-accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .btn-link:hover {
+      color: #0284c7;
+      text-decoration: underline;
+    }
+
+    /* Card Styles */
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+      background-color: var(--surface);
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      background-color: var(--background);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .card-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .card-text {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    /* Form Elements */
+    .form-label {
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.625rem 0.875rem;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      background-color: var(--surface);
+      color: var(--text-primary);
+    }
+
+    .form-control:focus, .form-select:focus {
+      border-color: var(--primary-accent);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+      outline: none;
+    }
+
+    .form-text {
+      color: var(--text-light);
+      font-size: 0.85rem;
+      margin-top: 0.25rem;
+    }
+
+    /* Badge Styles */
+    .badge {
+      border-radius: 20px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .bg-success {
+      background-color: var(--success) !important;
+    }
+
+    .bg-warning {
+      background-color: var(--warning) !important;
+    }
+
+    .bg-danger {
+      background-color: var(--danger) !important;
+    }
+
+    /* Table Styles */
+    .table {
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .table thead {
+      background-color: var(--background);
+      border-bottom: 2px solid var(--border);
+    }
+
+    .table th {
+      font-weight: 600;
+      color: var(--text-primary);
+      padding: 1rem 0.75rem;
+    }
+
+    .table td {
+      padding: 0.875rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    .table-striped tbody tr:hover {
+      background-color: rgba(14, 165, 233, 0.03);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      main.container {
+        padding: 1rem;
+      }
+
+      .navbar-brand {
+        font-size: 1.25rem;
+      }
+
+      .nav-link {
+        padding: 0.75rem 0.5rem !important;
+      }
+    }
+  </style>
+
+  
+<style>
+  .rekon-shell {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .rekon-hero {
+    border-radius: 1rem;
+    border: 1px solid rgba(12, 74, 110, 0.18);
+    background:
+      radial-gradient(circle at 12% 22%, rgba(56, 189, 248, 0.2), transparent 42%),
+      radial-gradient(circle at 88% 78%, rgba(6, 182, 212, 0.16), transparent 38%),
+      linear-gradient(135deg, #f0f9ff 0%, #ecfeff 55%, #f8fafc 100%);
+    padding: 1.25rem;
+  }
+
+  .rekon-title {
+    margin: 0 0 0.35rem;
+    letter-spacing: 0.01em;
+    font-weight: 800;
+    color: #0c4a6e;
+  }
+
+  .rekon-subtitle {
+    margin: 0;
+    color: #155e75;
+    line-height: 1.55;
+  }
+
+  .rekon-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1rem;
+  }
+
+  .rekon-panel {
+    border: 1px solid var(--border);
+    border-radius: 0.9rem;
+    background: var(--surface);
+    padding: 1rem;
+  }
+
+  .rekon-panel h6 {
+    margin: 0 0 0.5rem;
+    font-weight: 700;
+  }
+
+  .rekon-support-list {
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+    font-size: 0.92rem;
+  }
+
+  .rekon-chip-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.6rem;
+  }
+
+  .rekon-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(14, 116, 144, 0.08);
+    color: #155e75;
+    border: 1px solid rgba(14, 116, 144, 0.25);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  #dropzone {
+    border: 1.5px dashed rgba(14, 116, 144, 0.35) !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+    transition: 160ms ease;
+  }
+
+  #dropzone:hover {
+    border-color: rgba(14, 116, 144, 0.62) !important;
+    transform: translateY(-1px);
+  }
+
+  .rekon-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+    gap: 0.9rem;
+    margin-top: 0.9rem;
+  }
+
+  .rekon-actions {
+    margin-top: 0.85rem;
+  }
+
+  @media (max-width: 992px) {
+    .rekon-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .rekon-controls {
+      grid-template-columns: 1fr;
+    }
+
+    .rekon-hero,
+    .rekon-panel {
+      padding: 0.9rem;
+    }
+  }
+</style>
+
+</head>
+<body class="">
+<!-- Modernized navbar with gradient and new styling -->
+<nav class="navbar navbar-expand-lg navbar-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="index.html">
+      <img src="static/logo.png" alt="Logo" class="navbar-logo">
+      SLIS
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarNav" aria-controls="navbarNav"
+            aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link " href="index.html">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="sanctions_manage.html">Sanctions</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="screening_jobs.html">Jobs</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="data_explorer.html">Data Explorer</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="file_splitter.html">Splitting</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="rekon_ai.html">Rekon-AI</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="lhp_ai.html">LHP-AI</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <!-- Enhanced alert system with new color scheme -->
+  
+    
+  
+
+  
+<div class="card">
+  <div class="card-body">
+    <div class="rekon-shell">
+      <section class="rekon-hero">
+        <h3 class="rekon-title">Rekon-AI</h3>
+        <p class="rekon-subtitle">
+          Ekstraksi rekening koran PDF menjadi tabel standar: <b>Tanggal</b>, <b>Keterangan</b>, <b>Cabang</b>, <b>Tipe (CR/DB)</b>, <b>Nominal</b>, dan <b>Saldo</b>.
+          Proses berjalan lokal di server ini dan hasil bisa diunduh dalam format Excel.
+        </p>
+      </section>
+
+      <section class="rekon-grid">
+        <div class="rekon-panel">
+          <h6>Upload Dokumen</h6>
+          <div
+            id="dropzone"
+            class="p-4 rounded"
+            style="text-align:center;"
+          >
+            <div class="mb-2"><b>Drag & drop</b> file <b>PDF</b> / <b>ZIP</b> di sini</div>
+            <div class="small text-muted">atau pilih file / folder</div>
+            <div class="mt-3" style="max-width: 520px; margin: 0 auto;">
+              <input class="form-control" type="file" id="fileInput" accept="application/pdf,.pdf,application/zip,.zip" multiple />
+              <div class="small text-muted" style="margin-top: 0.35rem;">
+                Bisa upload banyak PDF sekaligus, atau 1 ZIP berisi PDF (boleh nested subfolder).
+              </div>
+              <div class="mt-2 small text-muted">Atau pilih folder (recursive)</div>
+              <input class="form-control" type="file" id="folderInput" webkitdirectory directory multiple />
+            </div>
+            <div class="mt-2 small text-muted" id="fileHint">Belum ada file dipilih</div>
+          </div>
+
+          <div class="rekon-controls">
+            <div>
+              <label class="form-label mb-1">Grouping sheet (Download Excel)</label>
+              <select id="groupBy" class="form-select">
+                <option value="file" selected>Sheet per file PDF (nama sheet = nama file)</option>
+                <option value="account">Sheet per rekening (nama/no rekening)</option>
+                <option value="bank">Sheet per bank (BCA, Mandiri, BNI, dll)</option>
+              </select>
+              <div class="small text-muted" style="margin-top: 0.35rem;">Sheet <b>MASTER</b> selalu berisi semuanya.</div>
+            </div>
+
+            <div>
+              <label class="form-label mb-1">Output download</label>
+              <select id="outputMode" class="form-select">
+                <option value="single" selected>1 Excel (MASTER + sheet terpisah)</option>
+                <option value="per_pdf_zip">ZIP (1 Excel per PDF + MASTER)</option>
+              </select>
+              <div class="small text-muted" style="margin-top: 0.35rem;">Mode ZIP berisi file per PDF + 1 file MASTER gabungan.</div>
+            </div>
+
+            <div>
+              <label class="form-label mb-1">Password PDF (opsional)</label>
+              <input id="pdfPassword" class="form-control" type="password" autocomplete="off" placeholder="Isi jika PDF terkunci (encrypted)" />
+              <div class="small text-muted" style="margin-top: 0.35rem;">Password ini akan dicoba untuk semua PDF.</div>
+            </div>
+          </div>
+
+          <div class="rekon-actions d-flex gap-2 flex-wrap">
+            <button id="btnExtract" class="btn btn-primary" disabled>Extract</button>
+            <button id="btnDownload" class="btn btn-outline-secondary" disabled>Download Excel</button>
+            <a class="btn btn-outline-secondary" href="index.html">Kembali</a>
+          </div>
+        </div>
+
+        <aside class="rekon-panel">
+          <h6>Dukungan Rekening</h6>
+          <p class="small text-muted mb-2">
+            Rekon-AI saat ini optimal untuk rekening koran PDF bank Indonesia, termasuk template native PDF dan scan (OCR fallback).
+          </p>
+          <ul class="rekon-support-list">
+            <li>Bank utama: BCA, Mandiri, BRI iBiz.</li>
+            <li>Template fleksibel yang sudah tervalidasi: BNI, CIMB, Victoria, JTrust, Muamalat, Mayapada, Permata, Capital, dan template serupa.</li>
+            <li>Tipe rekening: paling cocok untuk giro/corporate statement; tabungan tetap bisa selama format mutasi + saldo terbaca.</li>
+            <li>Jika dokumen kosong (tidak ada mutasi), sistem akan menandai sebagai no mutation tanpa error.</li>
+          </ul>
+          <div class="rekon-chip-wrap">
+            <span class="rekon-chip">PDF Native</span>
+            <span class="rekon-chip">PDF Scan OCR</span>
+            <span class="rekon-chip">ZIP Batch</span>
+            <span class="rekon-chip">Multi Folder</span>
+            <span class="rekon-chip">Export Excel</span>
+          </div>
+        </aside>
+      </section>
+    </div>
+
+    <div id="progressWrap" class="mt-3" style="display:none;">
+      <div class="d-flex justify-content-between small text-muted mb-1">
+        <div id="progressStage">Uploading...</div>
+        <div>
+          <span id="progressPct">0</span>%
+          <span id="progressEta" class="ms-1"></span>
+        </div>
+      </div>
+      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="height: 10px;">
+        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div id="status" class="mt-3"></div>
+    <div id="meta" class="mt-2 small text-muted"></div>
+
+    <div id="notProcessedWrap" class="mt-3" style="display:none;">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div><b>Dokumen tidak terolah</b></div>
+        <div class="small text-muted"><span id="notProcessedCount">0</span></div>
+      </div>
+      <div id="notProcessedNote" class="small text-muted mb-2"></div>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0">
+          <thead>
+            <tr>
+              <th>File</th>
+              <th>Jenis</th>
+              <th>Alasan</th>
+            </tr>
+          </thead>
+          <tbody id="notProcessedBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="top10Wrap" class="mt-4" style="display:none;">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div><b>Top 10 Mutasi (CR/DB)</b></div>
+        <div class="small text-muted" id="top10Meta"></div>
+      </div>
+      <div id="top10Body"></div>
+    </div>
+
+    <div class="table-responsive mt-4">
+      <table class="table table-striped" id="previewTable" style="display:none;">
+        <thead>
+          <tr>
+            <th>Bank</th>
+            <th>Tanggal</th>
+            <th>Keterangan</th>
+            <th>Cabang</th>
+            <th>Tipe</th>
+            <th>Nominal</th>
+            <th>Saldo</th>
+          </tr>
+        </thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+></script>
+
+
+<script>
+(() => {
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const folderInput = document.getElementById('folderInput');
+  const fileHint = document.getElementById('fileHint');
+  const btnExtract = document.getElementById('btnExtract');
+  const btnDownload = document.getElementById('btnDownload');
+  const groupBy = document.getElementById('groupBy');
+  const outputMode = document.getElementById('outputMode');
+  const pdfPassword = document.getElementById('pdfPassword');
+  const statusEl = document.getElementById('status');
+  const metaEl = document.getElementById('meta');
+  const previewTable = document.getElementById('previewTable');
+  const previewBody = document.getElementById('previewBody');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressStage = document.getElementById('progressStage');
+  const progressPct = document.getElementById('progressPct');
+  const progressEta = document.getElementById('progressEta');
+  const progressBar = document.getElementById('progressBar');
+  const notProcessedWrap = document.getElementById('notProcessedWrap');
+  const notProcessedCount = document.getElementById('notProcessedCount');
+  const notProcessedNote = document.getElementById('notProcessedNote');
+  const notProcessedBody = document.getElementById('notProcessedBody');
+  const top10Wrap = document.getElementById('top10Wrap');
+  const top10Meta = document.getElementById('top10Meta');
+  const top10Body = document.getElementById('top10Body');
+
+  let selectedFiles = [];
+  let previewRows = [];
+  let clientSkippedIssues = [];
+  let lastCacheKey = null;
+  let progressTimer = null;
+  let lastProgress = 0;
+  let perfProfile = null;
+
+  function _clamp(n, a, b) {
+    return Math.max(a, Math.min(b, n));
+  }
+
+  function formatDuration(ms) {
+    if (ms == null || !Number.isFinite(ms)) return '';
+    const s = Math.max(0, Math.round(ms / 1000));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    if (m <= 0) return `${r}s`;
+    return `${m}m ${String(r).padStart(2, '0')}s`;
+  }
+
+  function getPerfProfile() {
+    if (perfProfile) return perfProfile;
+    try {
+      const raw = localStorage.getItem('rekonAiPerf');
+      perfProfile = raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      perfProfile = {};
+    }
+    return perfProfile;
+  }
+
+  function savePerfProfile(next) {
+    perfProfile = next || {};
+    try {
+      localStorage.setItem('rekonAiPerf', JSON.stringify(perfProfile));
+    } catch (_) {}
+  }
+
+  function updatePerfEstimate({ processingMs, files }) {
+    if (!processingMs || !files || !files.length) return;
+
+    const totalBytes = files.reduce((acc, f) => acc + (f && f.size ? f.size : 0), 0);
+    const totalMB = totalBytes / (1024 * 1024);
+    const n = files.length;
+
+    const msPerMBObs = processingMs / Math.max(0.25, totalMB);
+    const msPerFileObs = processingMs / Math.max(1, n);
+
+    const clampObs = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const msPerMB = clampObs(msPerMBObs, 50, 20000);
+    const msPerFile = clampObs(msPerFileObs, 80, 60000);
+
+    const prev = getPerfProfile();
+    const alpha = 0.25;
+    const next = {
+      msPerMB: (typeof prev.msPerMB === 'number') ? (prev.msPerMB * (1 - alpha) + msPerMB * alpha) : msPerMB,
+      msPerFile: (typeof prev.msPerFile === 'number') ? (prev.msPerFile * (1 - alpha) + msPerFile * alpha) : msPerFile,
+      updatedAt: Date.now(),
+    };
+    savePerfProfile(next);
+  }
+
+  function estimateProcessingMs(files, { kind = 'extract' } = {}) {
+    const totalBytes = (files || []).reduce((acc, f) => acc + (f && f.size ? f.size : 0), 0);
+    const totalMB = totalBytes / (1024 * 1024);
+    const n = (files || []).length;
+    const nZip = (files || []).filter(f => {
+      const name = (f && f.name) ? String(f.name).toLowerCase() : '';
+      return name.endsWith('.zip');
+    }).length;
+
+    const prof = getPerfProfile();
+    const msPerMB = (typeof prof.msPerMB === 'number') ? prof.msPerMB : 450;
+    const msPerFile = (typeof prof.msPerFile === 'number') ? prof.msPerFile : 700;
+
+    const base = 1200;
+    const zipPenalty = 1400 * nZip;
+    let est = base + (msPerFile * n) + (msPerMB * totalMB) + zipPenalty;
+
+    // Download tends to include some extra work (xlsx creation).
+    if (kind === 'download') est = est * 1.25;
+
+    // Clamp: min 2s, max 25 minutes.
+    est = _clamp(est, 2000, 25 * 60 * 1000);
+    return est;
+  }
+
+  function showProgress(stage, pct, { etaMs = null } = {}) {
+    lastProgress = 0;
+    progressWrap.style.display = '';
+    setProgress(stage, pct, { etaMs });
+  }
+
+  function setProgress(stage, pct, { etaMs = null } = {}) {
+    const p = _clamp(Math.round(pct || 0), 0, 100);
+    lastProgress = Math.max(lastProgress, p);
+    if (progressStage) progressStage.textContent = stage || '';
+    if (progressPct) progressPct.textContent = String(lastProgress);
+    if (progressBar) progressBar.style.width = `${lastProgress}%`;
+    if (progressEta) {
+      progressEta.textContent = etaMs != null ? `ETA ~ ${formatDuration(etaMs)}` : '';
+    }
+  }
+
+  function startProcessingProgress(stageLabel, { startPct = 80, endPct = 99, estimateMs = 60000 } = {}) {
+    stopProgressTimer();
+
+    const startedAt = performance.now();
+    let est = Math.max(1000, estimateMs || 60000);
+    const start = _clamp(startPct, 0, 99);
+    const end = _clamp(endPct, start + 1, 99);
+
+    setProgress(stageLabel, Math.max(start, lastProgress), { etaMs: est });
+
+    progressTimer = setInterval(() => {
+      const now = performance.now();
+      const elapsed = now - startedAt;
+
+      // If we underestimated, extend estimate so progress doesn't get stuck early.
+      if (elapsed > est * 1.05) {
+        est = Math.max(est * 1.25, elapsed * 1.15);
+      }
+
+      const ratio = est > 0 ? (elapsed / est) : 0;
+      const t = _clamp(ratio, 0, 0.999);
+      const eased = 1 - Math.pow(1 - t, 2); // easeOutQuad
+      const pct = start + ((end - start) * eased);
+      const remaining = Math.max(0, est - elapsed);
+      setProgress(stageLabel, pct, { etaMs: remaining });
+    }, 250);
+  }
+
+  function stopProgressTimer() {
+    if (progressTimer) {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    }
+  }
+
+  function endProgress() {
+    stopProgressTimer();
+    setProgress('Selesai', 100, { etaMs: null });
+    setTimeout(() => {
+      if (progressWrap) progressWrap.style.display = 'none';
+      if (progressBar) progressBar.style.width = '0%';
+      if (progressPct) progressPct.textContent = '0';
+      if (progressStage) progressStage.textContent = '';
+      if (progressEta) progressEta.textContent = '';
+      lastProgress = 0;
+    }, 400);
+  }
+
+  function failProgress() {
+    stopProgressTimer();
+    if (progressWrap) progressWrap.style.display = 'none';
+    if (progressBar) progressBar.style.width = '0%';
+    if (progressPct) progressPct.textContent = '0';
+    if (progressStage) progressStage.textContent = '';
+    if (progressEta) progressEta.textContent = '';
+    lastProgress = 0;
+  }
+
+  function xhrPost(url, fd, { responseType = 'json', onUploadProgress, onUploadDone } = {}) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.responseType = responseType;
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (!onUploadProgress) return;
+        if (e.lengthComputable) {
+          onUploadProgress(e.loaded, e.total);
+        }
+      });
+      xhr.upload.addEventListener('load', () => {
+        if (onUploadDone) onUploadDone();
+      });
+
+      xhr.addEventListener('load', () => resolve(xhr));
+      xhr.addEventListener('error', () => reject(new Error('Network error')));
+      xhr.addEventListener('abort', () => reject(new Error('Request aborted')));
+
+      xhr.send(fd);
+    });
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+
+  function kindLabel(kind) {
+    const k = String(kind || '').toLowerCase();
+    if (!k) return '-';
+    if (k === 'client_skip') return 'Di-skip (client)';
+    if (k === 'skipped') return 'Di-skip (server)';
+    if (k === 'unsupported') return 'Tidak didukung';
+    if (k === 'extract') return 'Gagal ekstrak';
+    if (k === 'internal') return 'Internal error';
+    return k;
+  }
+
+  function coerceIssueList(raw, { defaultKind = 'skipped', defaultMessage = '' } = {}) {
+    const arr = Array.isArray(raw) ? raw : [];
+    const out = [];
+    for (const x of arr) {
+      if (!x) continue;
+      if (typeof x === 'string') {
+        const fn = x.trim();
+        if (!fn) continue;
+        out.push({ filename: fn, kind: defaultKind, message: defaultMessage });
+        continue;
+      }
+      if (typeof x === 'object') {
+        const fn = (x.filename || '').toString().trim() || '-';
+        const kind = (x.kind || defaultKind || '').toString().trim() || defaultKind;
+        const msg = (x.message || defaultMessage || '').toString();
+        out.push({ filename: fn, kind, message: msg });
+      }
+    }
+    return out;
+  }
+
+  function renderNotProcessed(issues, { note = '' } = {}) {
+    if (!notProcessedWrap || !notProcessedBody) return;
+
+    const list = Array.isArray(issues) ? issues.filter(Boolean) : [];
+    notProcessedBody.innerHTML = '';
+
+
+    if (!list.length) {
+
+      notProcessedWrap.style.display = 'none';
+      if (notProcessedCount) notProcessedCount.textContent = '0';
+      if (notProcessedNote) notProcessedNote.textContent = '';
+
+      return;
+    }
+
+    const maxRows = 300;
+
+    const shown = list.slice(0, maxRows);
+    for (const x of shown) {
+      const tr = document.createElement('tr');
+
+      const tdFile = document.createElement('td');
+      const code = document.createElement('code');
+
+      code.textContent = x && x.filename ? String(x.filename) : '-';
+      tdFile.appendChild(code);
+
+
+      const tdKind = document.createElement('td');
+
+      tdKind.textContent = kindLabel(x && x.kind);
+      tdKind.classList.add('text-nowrap');
+
+      const tdMsg = document.createElement('td');
+
+      tdMsg.textContent = x && x.message ? String(x.message) : '';
+
+      tr.appendChild(tdFile);
+      tr.appendChild(tdKind);
+      tr.appendChild(tdMsg);
+      notProcessedBody.appendChild(tr);
+    }
+
+
+    if (notProcessedCount) notProcessedCount.textContent = String(list.length);
+
+    let noteText = note || '';
+    if (list.length > shown.length) {
+
+      noteText = (noteText ? (noteText + ' ') : '') + `Ditampilkan ${shown.length} dari ${list.length}.`;
+    }
+    if (notProcessedNote) notProcessedNote.textContent = noteText;
+
+
+    notProcessedWrap.style.display = '';
+  }
+
+
+  function setStatus(kind, text, { html = false } = {}) {
+    statusEl.innerHTML = '';
+
+    if (!text) return;
+    const cls = kind === 'error' ? 'alert-danger' : (kind === 'warn' ? 'alert-warning' : 'alert-info');
+    const body = html ? String(text) : escapeHtml(text).replace(/\n/g, '<br>');
+
+    statusEl.innerHTML = `<div class="alert ${cls}" role="alert" style="margin-bottom:0;">${body}</div>`;
+  }
+
+
+  function buildFailedDetailsHtml(failedList, { failedTotal = null, truncated = false } = {}) {
+    const list = Array.isArray(failedList) ? failedList.filter(Boolean) : [];
+
+    if (!list.length) return '';
+
+    const items = list.map((x) => {
+      const fn = escapeHtml(x && x.filename ? x.filename : '-');
+
+      const kind = escapeHtml(x && x.kind ? x.kind : '');
+      const msg = escapeHtml(x && x.message ? x.message : '');
+      const kindHtml = kind ? ` <span class="text-muted">(${kind})</span>` : '';
+      return `<li><code>${fn}</code>${kindHtml}: ${msg}</li>`;
+    }).join('');
+
+    let note = '';
+    if (failedTotal != null && Number.isFinite(Number(failedTotal)) && list.length < Number(failedTotal)) {
+
+      note = `<div class="small text-muted mt-1">Ditampilkan ${list.length} dari ${Number(failedTotal)} dokumen gagal.</div>`;
+    } else if (truncated) {
+      note = `<div class="small text-muted mt-1">Daftar detail dipotong.</div>`;
+    }
+
+
+    return `
+      <details class="mt-2">
+
+        <summary>Detail dokumen tidak terolah</summary>
+        <ul class="mt-2 mb-0">${items}</ul>
+        ${note}
+
+      </details>
+    `;
+  }
+
+
+  function formatRupiah(value, { prefix = true } = {}) {
+    if (value == null) return '';
+
+    let s = String(value).trim();
+    if (!s) return '';
+
+    let negative = false;
+    if (s.startsWith('-')) {
+      negative = true;
+      s = s.slice(1);
+    }
+
+
+    let intPart = s;
+    let fracPart = '';
+
+    const dotIdx = s.indexOf('.');
+    if (dotIdx >= 0) {
+
+      intPart = s.slice(0, dotIdx);
+      fracPart = s.slice(dotIdx + 1);
+    }
+
+    intPart = (intPart || '0').replace(/\D/g, '');
+    fracPart = (fracPart || '').replace(/\D/g, '');
+    if (!fracPart) fracPart = '00';
+    if (fracPart.length === 1) fracPart = fracPart + '0';
+    if (fracPart.length > 2) fracPart = fracPart.slice(0, 2);
+
+    // thousands separator: '.'
+    intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const body = `${negative ? '-' : ''}${intPart},${fracPart}`;
+    return prefix ? `Rp ${body}` : body;
+  }
+
+  function escapeCsvCell(value) {
+    let s = value == null ? '' : String(value);
+
+    // Mitigate CSV injection for text-like cells.
+    if (s && (s[0] === '=' || s[0] === '+' || s[0] === '@')) {
+      s = "'" + s;
+    }
+
+    if (s.includes('"')) s = s.replaceAll('"', '""');
+    if (s.includes(',') || s.includes('\n') || s.includes('\r') || s.includes('"')) {
+      return `"${s}"`;
+    }
+    return s;
+  }
+
+  function rowsToCsv(rows) {
+    const header = ['Tanggal','Keterangan','Cabang','Tipe','Nominal','Saldo'];
+    const lines = [];
+    lines.push(header.map(escapeCsvCell).join(','));
+    for (const r of rows) {
+      lines.push((r || []).map(escapeCsvCell).join(','));
+    }
+    // UTF-8 BOM for Excel compatibility
+    return '\ufeff' + lines.join('\r\n');
+  }
+
+  function renderPreview(rows) {
+    previewBody.innerHTML = '';
+    if (!rows || !rows.length) {
+      previewTable.style.display = 'none';
+      return { shown: 0, total: 0, truncated: false };
+    }
+
+    const maxPreview = 200;
+    const preview = rows.slice(0, maxPreview);
+    for (const row of preview) {
+      const tr = document.createElement('tr');
+      for (let i = 0; i < 7; i++) {
+        const td = document.createElement('td');
+        const raw = row[i] == null ? '' : String(row[i]);
+        if (i === 5 || i === 6) {
+          td.textContent = formatRupiah(raw, { prefix: true });
+          td.classList.add('text-end');
+        } else {
+          td.textContent = raw;
+        }
+        tr.appendChild(td);
+      }
+      previewBody.appendChild(tr);
+    }
+    previewTable.style.display = '';
+
+    return {
+      shown: preview.length,
+      total: rows.length,
+      truncated: rows.length > maxPreview,
+    };
+  }
+
+  function renderTop10(top10ByOwner) {
+    if (!top10Wrap || !top10Body) return;
+
+    const owners = Array.isArray(top10ByOwner) ? top10ByOwner.filter(Boolean) : [];
+    top10Body.innerHTML = '';
+    if (top10Meta) top10Meta.textContent = '';
+
+    if (!owners.length) {
+      top10Wrap.style.display = 'none';
+      return;
+    }
+
+    let totalAccounts = 0;
+    for (const o of owners) {
+      const accs = Array.isArray(o && o.accounts) ? o.accounts : [];
+      totalAccounts += accs.length;
+    }
+    if (top10Meta) top10Meta.textContent = `${owners.length} pemilik • ${totalAccounts} rekening`;
+
+    function buildTopTable(items, { title }) {
+      const list = Array.isArray(items) ? items.filter(Boolean) : [];
+
+      const block = document.createElement('div');
+      block.classList.add('mt-2');
+
+      const heading = document.createElement('div');
+      heading.classList.add('small', 'text-muted');
+      heading.textContent = title || '';
+      block.appendChild(heading);
+
+      if (!list.length) {
+        const empty = document.createElement('div');
+        empty.classList.add('small', 'text-muted');
+        empty.textContent = 'Tidak ada transaksi.';
+        block.appendChild(empty);
+        return block;
+      }
+
+      const wrap = document.createElement('div');
+      wrap.classList.add('table-responsive', 'mt-1');
+
+      const table = document.createElement('table');
+      table.className = 'table table-sm table-striped mb-0';
+
+      const thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th>#</th><th>Tanggal</th><th class="text-end">Nominal</th><th>Keterangan</th><th>File</th></tr>';
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      list.slice(0, 10).forEach((x, idx) => {
+        const tr = document.createElement('tr');
+
+        const tdNo = document.createElement('td');
+        tdNo.textContent = String(idx + 1);
+        tdNo.classList.add('text-nowrap');
+
+        const tdDate = document.createElement('td');
+        tdDate.textContent = x && x.date ? String(x.date) : '';
+        tdDate.classList.add('text-nowrap');
+
+        const tdAmt = document.createElement('td');
+        tdAmt.textContent = formatRupiah(x && x.amount ? String(x.amount) : '', { prefix: true });
+        tdAmt.classList.add('text-end', 'text-nowrap');
+
+        const tdDesc = document.createElement('td');
+        tdDesc.textContent = x && x.description ? String(x.description) : '';
+
+        const tdFile = document.createElement('td');
+        const code = document.createElement('code');
+        code.textContent = x && x.source_pdf ? String(x.source_pdf) : '';
+        tdFile.appendChild(code);
+
+        tr.appendChild(tdNo);
+        tr.appendChild(tdDate);
+        tr.appendChild(tdAmt);
+        tr.appendChild(tdDesc);
+        tr.appendChild(tdFile);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+
+      wrap.appendChild(table);
+      block.appendChild(wrap);
+      return block;
+    }
+
+    for (const o of owners) {
+      const ownerBlock = document.createElement('div');
+      ownerBlock.classList.add('mb-4');
+
+      const ownerLabel = document.createElement('div');
+      ownerLabel.classList.add('small', 'text-muted');
+      ownerLabel.textContent = 'Pemilik rekening';
+
+      const ownerName = document.createElement('div');
+      const ownerB = document.createElement('b');
+      ownerB.textContent = (o && o.owner) ? String(o.owner) : '-';
+      ownerName.appendChild(ownerB);
+
+      ownerBlock.appendChild(ownerLabel);
+      ownerBlock.appendChild(ownerName);
+
+      const accounts = Array.isArray(o && o.accounts) ? o.accounts : [];
+      for (const acc of accounts) {
+        const accTitle = document.createElement('div');
+        accTitle.classList.add('mt-2');
+        const accB = document.createElement('b');
+        accB.textContent = (acc && acc.account_label) ? String(acc.account_label) : '-';
+        accTitle.appendChild(accB);
+        ownerBlock.appendChild(accTitle);
+
+        ownerBlock.appendChild(buildTopTable(acc && acc.top_cr ? acc.top_cr : [], { title: 'Top 10 CR (Kredit)' }));
+        ownerBlock.appendChild(buildTopTable(acc && acc.top_db ? acc.top_db : [], { title: 'Top 10 DB (Debit)' }));
+      }
+
+      top10Body.appendChild(ownerBlock);
+    }
+
+    top10Wrap.style.display = '';
+  }
+
+  function pickFiles(files) {
+    const incoming = (files || []).filter(Boolean);
+    const allowed = [];
+    const skipped = [];
+    for (const f of incoming) {
+      const name = (f && f.name) ? String(f.name).toLowerCase() : '';
+      if (name.endsWith('.pdf') || name.endsWith('.zip')) {
+        allowed.push(f);
+      } else {
+        skipped.push(f);
+      }
+    }
+
+    clientSkippedIssues = skipped.map((f) => {
+      const display = (f && f.webkitRelativePath && f.webkitRelativePath.length) ? f.webkitRelativePath : (f && f.name ? f.name : '-');
+      return {
+        filename: display,
+        kind: 'client_skip',
+        message: 'Bukan PDF/ZIP (tidak diupload)',
+      };
+    });
+
+    selectedFiles = allowed;
+    previewRows = [];
+    lastCacheKey = null;
+    btnDownload.disabled = true;
+    renderPreview([]);
+    renderTop10([]);
+    metaEl.textContent = '';
+    renderNotProcessed(clientSkippedIssues);
+
+    if (!selectedFiles.length) {
+      fileHint.textContent = 'Belum ada file dipilih';
+      btnExtract.disabled = true;
+      if (skipped.length) {
+        setStatus('warn', `File di-skip (bukan PDF/ZIP): ${skipped.length} file`);
+      }
+      return;
+    }
+
+    const totalBytes = selectedFiles.reduce((acc, f) => acc + (f.size || 0), 0);
+    const names = selectedFiles.slice(0, 5).map(f => (f.webkitRelativePath && f.webkitRelativePath.length) ? f.webkitRelativePath : f.name);
+    const more = selectedFiles.length > 5 ? ` +${selectedFiles.length - 5} file` : '';
+    fileHint.textContent = `Dipilih: ${selectedFiles.length} file (${Math.round(totalBytes/1024)} KB) — ${names.join(', ')}${more}`;
+    btnExtract.disabled = false;
+    if (skipped.length) {
+      setStatus('warn', `Siap diekstrak. (${skipped.length} file non-PDF/ZIP di-skip)`);
+    } else {
+      setStatus('info', 'Siap diekstrak. Klik Extract.');
+    }
+  }
+
+  async function doExtract() {
+    if (!selectedFiles.length) return;
+    btnExtract.disabled = true;
+    btnDownload.disabled = true;
+    setStatus('info', 'Memproses...');
+    metaEl.textContent = '';
+    showProgress('Uploading...', 0);
+    renderNotProcessed(clientSkippedIssues, { note: '' });
+    renderTop10([]);
+
+    const startedAt = performance.now();
+    let uploadDoneAt = null;
+    let uploadSpeedBps = null;
+    let uploadLastAt = null;
+    let uploadLastLoaded = 0;
+
+    try {
+      const fd = new FormData();
+      for (const f of selectedFiles) {
+        const uploadName = (f.webkitRelativePath && f.webkitRelativePath.length) ? f.webkitRelativePath : f.name;
+        fd.append('files', f, uploadName);
+      }
+      const pwd = pdfPassword && typeof pdfPassword.value === 'string' ? pdfPassword.value.trim() : '';
+      if (pwd) fd.append('pdf_password', pwd);
+
+      const xhr = await xhrPost('/api/rekon-ai/extract', fd, {
+        responseType: 'json',
+        onUploadProgress: (loaded, total) => {
+          const pct = total > 0 ? (loaded / total) * 80 : 0;
+          const now = performance.now();
+          if (uploadLastAt != null) {
+            const dt = now - uploadLastAt;
+            const dBytes = loaded - uploadLastLoaded;
+            if (dt > 0 && dBytes > 0) {
+              const instBps = dBytes / (dt / 1000);
+              uploadSpeedBps = uploadSpeedBps == null ? instBps : (uploadSpeedBps * 0.8 + instBps * 0.2);
+            }
+          }
+          uploadLastAt = now;
+          uploadLastLoaded = loaded;
+
+          const etaMs = (uploadSpeedBps && total > 0 && loaded <= total)
+            ? ((total - loaded) / uploadSpeedBps) * 1000
+            : null;
+          setProgress('Uploading...', pct, { etaMs });
+        },
+        onUploadDone: () => {
+          uploadDoneAt = performance.now();
+          const est = estimateProcessingMs(selectedFiles, { kind: 'extract' });
+          startProcessingProgress('Extracting...', { startPct: 80, endPct: 99, estimateMs: est });
+        }
+      });
+
+      const payload = xhr.response || {};
+      if (xhr.status < 200 || xhr.status >= 300 || !payload || payload.status !== 'success') {
+        const msg = (payload && payload.message) ? payload.message : `Gagal (HTTP ${xhr.status})`;
+        const totalDocs = payload && payload.total_documents != null ? payload.total_documents : null;
+        const failedDocs = payload && payload.failed_documents != null ? payload.failed_documents : null;
+        const suffix = (totalDocs != null && failedDocs != null) ? ` (Tidak terolah: ${failedDocs}/${totalDocs})` : '';
+
+        const failedDetails = buildFailedDetailsHtml(payload && payload.failed ? payload.failed : [], {
+          failedTotal: failedDocs,
+          truncated: !!(payload && payload.failed_truncated),
+        });
+
+        const serverFailed = coerceIssueList(payload && payload.failed ? payload.failed : [], { defaultKind: 'extract' });
+        const serverSkipped = coerceIssueList(payload && payload.skipped ? payload.skipped : [], {
+          defaultKind: 'skipped',
+          defaultMessage: 'Input di-skip oleh server',
+        });
+        renderNotProcessed([
+          ...(clientSkippedIssues || []),
+          ...serverFailed,
+          ...serverSkipped,
+        ], {
+          note: (payload && payload.failed_truncated) ? 'Daftar gagal dipotong oleh server.' : '',
+        });
+
+        if (failedDetails) {
+          setStatus('error', `${escapeHtml(msg + suffix)}${failedDetails}`, { html: true });
+        } else {
+          setStatus('error', msg + suffix);
+        }
+        failProgress();
+        btnExtract.disabled = false;
+        renderTop10([]);
+        return;
+      }
+
+      // Update client-side estimate (extract phase only; response is small).
+      const endedAt = performance.now();
+      if (uploadDoneAt != null) {
+        updatePerfEstimate({ processingMs: endedAt - uploadDoneAt, files: selectedFiles });
+      } else {
+        updatePerfEstimate({ processingMs: endedAt - startedAt, files: selectedFiles });
+      }
+
+      previewRows = payload.combined_preview || [];
+      lastCacheKey = payload.cache_key || null;
+      const files = payload.files || [];
+      const skipped = payload.skipped || [];
+      const totalDocs = payload.total_documents != null ? payload.total_documents : null;
+      const processedDocs = payload.processed_documents != null ? payload.processed_documents : null;
+      const failedDocs = payload.failed_documents != null ? payload.failed_documents : 0;
+      const totalRows = payload.combined_total_rows == null ? '-' : payload.combined_total_rows;
+      const banks = Array.from(new Set(files.map(x => (x && x.bank_label) ? String(x.bank_label) : '-').filter(Boolean)));
+      const accounts = Array.from(new Set(files.map(x => {
+        const m = (x && x.meta) ? x.meta : {};
+        const label = (m.account_name || m.account_no || '').toString().trim();
+        return label;
+      }).filter(Boolean)));
+      const accShort = accounts.length > 5 ? (accounts.slice(0, 5).join(', ') + ` +${accounts.length - 5}`) : (accounts.join(', ') || '-');
+      const skippedInfo = skipped && skipped.length ? ` | Skipped: ${skipped.length}` : '';
+      const failInfo = (totalDocs != null && failedDocs > 0) ? ` | Tidak terolah: ${failedDocs}/${totalDocs}` : '';
+      const okInfo = (totalDocs != null && processedDocs != null) ? ` | OK: ${processedDocs}/${totalDocs}` : '';
+      metaEl.textContent = `Files OK: ${files.length || selectedFiles.length}${okInfo} | Total rows: ${totalRows} | Bank: ${banks.join(', ') || '-'} | Rekening: ${accShort}${failInfo}${skippedInfo}`;
+
+      const serverFailed = coerceIssueList(payload.failed || [], { defaultKind: 'extract' });
+      const serverSkipped = coerceIssueList(payload.skipped || [], { defaultKind: 'skipped', defaultMessage: 'Input di-skip oleh server' });
+      renderNotProcessed([
+        ...(clientSkippedIssues || []),
+        ...serverFailed,
+        ...serverSkipped,
+      ], {
+        note: payload && payload.failed_truncated ? 'Daftar gagal dipotong oleh server.' : '',
+      });
+
+      renderTop10(payload.top10_by_owner || []);
+
+      if (!previewRows.length) {
+        setStatus('warn', 'Tidak ada baris yang berhasil diekstrak.');
+        endProgress();
+        btnExtract.disabled = false;
+        return;
+      }
+
+      const info = renderPreview(previewRows);
+      const parts = [];
+      if (info && info.truncated) {
+        parts.push(`Preview menampilkan ${info.shown} dari ${info.total} baris. Download Excel untuk hasil lengkap.`);
+      }
+      if (totalDocs != null && failedDocs > 0) {
+        parts.push(`Tidak terolah: ${failedDocs}/${totalDocs} dokumen.`);
+      }
+
+      const failedDetails = buildFailedDetailsHtml(payload.failed || [], {
+        failedTotal: failedDocs,
+        truncated: !!payload.failed_truncated,
+      });
+
+      if (parts.length) {
+        const base = escapeHtml(parts.join('\n')).replace(/\n/g, '<br>');
+        const html = failedDetails ? (base + failedDetails) : base;
+        setStatus(failedDocs > 0 ? 'warn' : 'info', html, { html: true });
+      } else {
+        setStatus('', '');
+      }
+
+      btnDownload.disabled = false;
+      btnExtract.disabled = false;
+      endProgress();
+    } catch (e) {
+      setStatus('error', `Error: ${e}`);
+      failProgress();
+      btnExtract.disabled = false;
+      renderTop10([]);
+    }
+  }
+
+  async function doDownload() {
+    if (!selectedFiles.length) return;
+
+    btnExtract.disabled = true;
+    btnDownload.disabled = true;
+    setStatus('info', 'Menyiapkan Excel...');
+    showProgress('Uploading...', 0);
+
+    let uploadDoneAt = null;
+    let uploadSpeedBps = null;
+    let uploadLastAt = null;
+    let uploadLastLoaded = 0;
+
+    try {
+      const fd = new FormData();
+      if (lastCacheKey) {
+        // Pakai hasil extract yang sudah di-cache — tidak perlu upload & proses ulang.
+        fd.append('cache_key', lastCacheKey);
+      } else {
+        for (const f of selectedFiles) {
+          const uploadName = (f.webkitRelativePath && f.webkitRelativePath.length) ? f.webkitRelativePath : f.name;
+          fd.append('files', f, uploadName);
+        }
+        const pwd = pdfPassword && typeof pdfPassword.value === 'string' ? pdfPassword.value.trim() : '';
+        if (pwd) fd.append('pdf_password', pwd);
+      }
+      fd.append('group_by', groupBy && groupBy.value ? groupBy.value : 'file');
+      fd.append('output_mode', outputMode && outputMode.value ? outputMode.value : 'single');
+
+      const xhr = await xhrPost('/api/rekon-ai/export-xlsx', fd, {
+        responseType: 'blob',
+        onUploadProgress: (loaded, total) => {
+          const pct = total > 0 ? (loaded / total) * 80 : 0;
+          const now = performance.now();
+          if (uploadLastAt != null) {
+            const dt = now - uploadLastAt;
+            const dBytes = loaded - uploadLastLoaded;
+            if (dt > 0 && dBytes > 0) {
+              const instBps = dBytes / (dt / 1000);
+              uploadSpeedBps = uploadSpeedBps == null ? instBps : (uploadSpeedBps * 0.8 + instBps * 0.2);
+            }
+          }
+          uploadLastAt = now;
+          uploadLastLoaded = loaded;
+
+          const etaMs = (uploadSpeedBps && total > 0 && loaded <= total)
+            ? ((total - loaded) / uploadSpeedBps) * 1000
+            : null;
+          setProgress('Uploading...', pct, { etaMs });
+        },
+        onUploadDone: () => {
+          uploadDoneAt = performance.now();
+          const est = estimateProcessingMs(selectedFiles, { kind: 'download' });
+          startProcessingProgress('Generating Excel...', { startPct: 80, endPct: 99, estimateMs: est });
+        }
+      });
+
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const ct = (xhr.getResponseHeader('content-type') || '').toLowerCase();
+        let msg = `Gagal (HTTP ${xhr.status})`;
+        if (ct.includes('application/json') && xhr.response) {
+          try {
+            const text = await xhr.response.text();
+            const payload = JSON.parse(text || '{}');
+            if (payload && payload.message) msg = payload.message;
+          } catch (_) {}
+        }
+        setStatus('error', msg);
+        failProgress();
+        btnExtract.disabled = false;
+        btnDownload.disabled = false;
+        return;
+      }
+
+      const blob = xhr.response;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const mode = outputMode && outputMode.value ? outputMode.value : 'single';
+      a.download = mode === 'per_pdf_zip' ? 'rekon_ai_export.zip' : 'rekon_ai_export.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      const totalDocs = parseInt(xhr.getResponseHeader('X-RekonAI-Total-PDF') || '0', 10);
+      const failedDocs = parseInt(xhr.getResponseHeader('X-RekonAI-Failed-PDF') || '0', 10);
+      if (totalDocs > 0 && failedDocs > 0) {
+        const hint = (outputMode && outputMode.value === 'per_pdf_zip')
+          ? 'Buka file MASTER.xlsx, sheet "FAILED".'
+          : 'Buka sheet "FAILED" di Excel untuk lihat daftar file + alasan.';
+        setStatus('warn', `Download selesai. Tidak terolah: ${failedDocs}/${totalDocs} dokumen. ${hint}`);
+      } else {
+        setStatus('', '');
+      }
+      btnExtract.disabled = false;
+      btnDownload.disabled = false;
+      endProgress();
+    } catch (e) {
+      setStatus('error', `Error: ${e}`);
+      failProgress();
+      btnExtract.disabled = false;
+      btnDownload.disabled = false;
+    }
+  }
+
+  // Events
+  fileInput.addEventListener('change', (e) => {
+    const files = e.target && e.target.files ? Array.from(e.target.files) : [];
+    pickFiles(files);
+  });
+  folderInput.addEventListener('change', (e) => {
+    const files = e.target && e.target.files ? Array.from(e.target.files) : [];
+    pickFiles(files);
+  });
+  btnExtract.addEventListener('click', doExtract);
+  btnDownload.addEventListener('click', doDownload);
+
+  // Drag & drop
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.style.opacity = '0.85';
+  });
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.style.opacity = '';
+  });
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.style.opacity = '';
+    const files = e.dataTransfer && e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+    if (files && files.length) {
+      pickFiles(files);
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

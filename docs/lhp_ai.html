@@ -1,0 +1,1089 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SLIS - Sanction List Screening System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap 5 CDN -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+    crossorigin="anonymous"
+  >
+
+  <!-- Google Fonts for modern typography -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* Complete redesign: modern color system, typography, and layout */
+    :root {
+      --primary: #0f172a;
+      --primary-light: #1e293b;
+      --primary-accent: #0ea5e9;
+      --secondary: #6366f1;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --background: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --text-light: #94a3b8;
+
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.10);
+      --shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.16);
+      --ring: 0 0 0 3px rgba(14, 165, 233, 0.18);
+    }
+
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    body {
+      --app-bg-opacity: 0.24;
+      --app-bg-blur: 3px;
+      --app-particles-opacity: 0.18;
+      background-color: var(--background);
+      position: relative;
+      isolation: isolate;
+      color: var(--text-primary);
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
+
+    /* App background (all pages): blurred image + soft gradient */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(135deg, rgba(2, 6, 23, 0.44) 0%, rgba(2, 6, 23, 0.10) 45%, rgba(2, 6, 23, 0.32) 100%),
+        url("static/bgutama.png");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: var(--app-bg-opacity);
+      filter: blur(var(--app-bg-blur)) saturate(1.08) contrast(1.02);
+      transform: scale(1.04);
+      z-index: -2;
+      pointer-events: none;
+    }
+
+    /* Subtle particle overlay (all pages) */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: -20vh -20vw;
+      z-index: -1;
+      pointer-events: none;
+      opacity: var(--app-particles-opacity);
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.30) 0 1px, transparent 2px),
+        radial-gradient(circle at 30% 80%, rgba(255, 255, 255, 0.22) 0 1px, transparent 2px),
+        radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.18) 0 1px, transparent 2px),
+        radial-gradient(circle at 85% 65%, rgba(255, 255, 255, 0.20) 0 1px, transparent 2px),
+        radial-gradient(circle at 55% 15%, rgba(255, 255, 255, 0.14) 0 1px, transparent 2px),
+        radial-gradient(circle at 45% 55%, rgba(255, 255, 255, 0.16) 0 1px, transparent 2px);
+      background-size: 220px 220px, 260px 260px, 240px 240px, 300px 300px, 280px 280px, 320px 320px;
+      background-repeat: repeat;
+      filter: blur(0.2px);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      body::after {
+        animation: particleDrift 22s linear infinite;
+      }
+      @keyframes particleDrift {
+        0% { transform: translate3d(0, 0, 0); }
+        100% { transform: translate3d(80px, -60px, 0); }
+      }
+    }
+
+    a { transition: color 0.2s ease, opacity 0.2s ease; }
+
+    /* Gentle page entrance */
+    @media (prefers-reduced-motion: no-preference) {
+      main.container { animation: fadeUp 420ms ease both; }
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    }
+
+    /* Home modifier (optional): slightly stronger background */
+    body.home-bg {
+      --app-bg-opacity: 0.28;
+      --app-particles-opacity: 0.22;
+    }
+
+    /* Navbar Styling */
+    .navbar {
+      background:
+        linear-gradient(90deg, rgba(0, 85, 150, 0.94) 0%, rgba(11, 107, 181, 0.92) 55%, rgba(0, 85, 150, 0.94) 100%);
+      padding: 0.75rem 0;
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.18);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 1030;
+    }
+
+    .navbar .container-fluid {
+      max-width: 1200px;
+      padding-left: 1.25rem;
+      padding-right: 1.25rem;
+    }
+
+    .navbar-brand {
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: rgba(255, 255, 255, 0.96) !important;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.25rem 0;
+    }
+
+    .navbar-brand:hover {
+      opacity: 0.92;
+    }
+
+    .navbar-logo {
+      width: clamp(72px, 6vw, 112px);
+      height: auto;
+      max-height: 96px;
+      object-fit: contain;
+    }
+
+    .nav-link {
+      color: rgba(255, 255, 255, 0.86) !important;
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 0.55rem 0.9rem !important;
+      border-radius: 999px;
+      transition: all 0.2s ease;
+      position: relative;
+      line-height: 1.1;
+    }
+
+    .nav-link:hover {
+      background-color: rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.98) !important;
+    }
+
+    .nav-link.active {
+      background-color: rgba(255, 255, 255, 0.20);
+      color: rgba(255, 255, 255, 0.98) !important;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      display: none;
+    }
+
+    .navbar-toggler {
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 10px;
+      padding: 0.45rem 0.6rem;
+      box-shadow: 0 6px 18px rgba(2, 6, 23, 0.14);
+    }
+
+    .navbar-toggler:focus {
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+    }
+
+    @media (max-width: 991.98px) {
+      .navbar .navbar-nav {
+        padding-top: 0.5rem;
+        gap: 0.25rem;
+      }
+      .nav-link {
+        border-radius: 10px;
+      }
+    }
+
+    /* Main Container */
+    main.container {
+      max-width: 1200px;
+      padding: 1.5rem;
+    }
+
+    /* Glass utility (optional) */
+    .glass {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* Alerts */
+    .alert {
+      border-radius: 8px;
+      border: none;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .alert-success {
+      background-color: #ecfdf5;
+      color: #065f46;
+    }
+
+    .alert-danger {
+      background-color: #fef2f2;
+      color: #7f1d1d;
+    }
+
+    .alert-warning {
+      background-color: #fffbeb;
+      color: #78350f;
+    }
+
+    .alert-info {
+      background-color: #f0f9ff;
+      color: #0c2d6b;
+    }
+
+    /* Button Styles */
+    .btn {
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 0.6rem 1.2rem;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .btn-sm {
+      padding: 0.45rem 0.85rem;
+      font-size: 0.85rem;
+      border-radius: 10px;
+    }
+
+    .btn:focus-visible {
+      outline: none;
+      box-shadow: var(--ring);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary-accent), #38bdf8);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #0284c7;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, var(--secondary), #8b5cf6);
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background-color: #4f46e5;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, var(--success), #22c55e);
+      color: white;
+    }
+
+    .btn-success:hover {
+      background-color: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-warning {
+      background: linear-gradient(135deg, var(--warning), #fb923c);
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background-color: #d97706;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-lg {
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+    }
+
+    .btn-link {
+      color: var(--primary-accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .btn-link:hover {
+      color: #0284c7;
+      text-decoration: underline;
+    }
+
+    /* Card Styles */
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+      background-color: var(--surface);
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      background-color: var(--background);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .card-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .card-text {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    /* Form Elements */
+    .form-label {
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.625rem 0.875rem;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      background-color: var(--surface);
+      color: var(--text-primary);
+    }
+
+    .form-control:focus, .form-select:focus {
+      border-color: var(--primary-accent);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+      outline: none;
+    }
+
+    .form-text {
+      color: var(--text-light);
+      font-size: 0.85rem;
+      margin-top: 0.25rem;
+    }
+
+    /* Badge Styles */
+    .badge {
+      border-radius: 20px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .bg-success {
+      background-color: var(--success) !important;
+    }
+
+    .bg-warning {
+      background-color: var(--warning) !important;
+    }
+
+    .bg-danger {
+      background-color: var(--danger) !important;
+    }
+
+    /* Table Styles */
+    .table {
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .table thead {
+      background-color: var(--background);
+      border-bottom: 2px solid var(--border);
+    }
+
+    .table th {
+      font-weight: 600;
+      color: var(--text-primary);
+      padding: 1rem 0.75rem;
+    }
+
+    .table td {
+      padding: 0.875rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    .table-striped tbody tr:hover {
+      background-color: rgba(14, 165, 233, 0.03);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      main.container {
+        padding: 1rem;
+      }
+
+      .navbar-brand {
+        font-size: 1.25rem;
+      }
+
+      .nav-link {
+        padding: 0.75rem 0.5rem !important;
+      }
+    }
+  </style>
+
+  
+<style>
+  .lhp-shell { display: grid; gap: 1rem; }
+
+  .lhp-hero {
+    border-radius: 1rem;
+    border: 1px solid rgba(12, 74, 110, 0.18);
+    background:
+      radial-gradient(circle at 12% 22%, rgba(56, 189, 248, 0.2), transparent 42%),
+      radial-gradient(circle at 88% 78%, rgba(6, 182, 212, 0.16), transparent 38%),
+      linear-gradient(135deg, #f0f9ff 0%, #ecfeff 55%, #f8fafc 100%);
+    padding: 1.25rem;
+  }
+
+  .lhp-title { margin: 0 0 0.35rem; font-weight: 800; color: #0c4a6e; letter-spacing: 0.01em; }
+  .lhp-subtitle { margin: 0; color: #155e75; line-height: 1.55; }
+
+  .lhp-panel {
+    border: 1px solid var(--border);
+    border-radius: 0.9rem;
+    background: var(--surface);
+    padding: 1rem;
+  }
+
+  .lhp-panel h6 { margin: 0 0 0.6rem; font-weight: 700; }
+
+  .lhp-dropzone {
+    border: 2px dashed rgba(12, 74, 110, 0.35);
+    border-radius: 0.9rem;
+    padding: 1.25rem;
+    text-align: center;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .lhp-dropzone.dragover { background: rgba(56, 189, 248, 0.12); border-color: #0284c7; }
+
+  .lhp-company {
+    border: 1px solid var(--border);
+    border-radius: 0.9rem;
+    margin-bottom: 0.9rem;
+    overflow: hidden;
+  }
+
+  .lhp-company-head {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.75rem 1rem;
+    background: rgba(240, 249, 255, 0.75);
+    cursor: pointer;
+  }
+
+  .lhp-company-head h6 { margin: 0; font-weight: 700; flex: 1; }
+  .lhp-company-body { padding: 1rem; border-top: 1px solid var(--border); }
+
+  .lhp-field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .lhp-label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.2rem; }
+  .lhp-required { border-color: #f59e0b !important; background: #fffbeb; }
+
+  .lhp-check-table { font-size: 0.86rem; width: 100%; }
+  .lhp-check-table td, .lhp-check-table th { padding: 0.3rem 0.4rem; vertical-align: middle; }
+  .lhp-check-table tbody tr:nth-child(odd) { background: rgba(248, 250, 252, 0.7); }
+
+  .lhp-mark { display: inline-flex; gap: 0.25rem; }
+  .lhp-mark button {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 0.35rem;
+    padding: 0.05rem 0.45rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+  .lhp-mark button.on-ada { background: #dcfce7; border-color: #16a34a; color: #14532d; font-weight: 700; }
+  .lhp-mark button.on-tidak { background: #fee2e2; border-color: #dc2626; color: #7f1d1d; font-weight: 700; }
+
+  .lhp-lowconf { outline: 2px solid #f59e0b; outline-offset: 1px; border-radius: 0.35rem; }
+
+  /* The examiner's own printed summary, shown as the source of the findings. */
+  .lhp-narasi {
+    border-left: 3px solid #0ea5e9;
+    background: rgba(240, 249, 255, 0.7);
+    padding: 0.5rem 0.7rem;
+    border-radius: 0.35rem;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: #0f172a;
+  }
+
+  .lhp-photos { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+  .lhp-photo {
+    width: 170px;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 0.4rem;
+    background: var(--surface);
+  }
+  .lhp-photo img { width: 100%; height: 105px; object-fit: cover; border-radius: 0.35rem; }
+  .lhp-photo input { font-size: 0.75rem; margin-top: 0.3rem; }
+  .lhp-photo.off { opacity: 0.4; }
+
+  .lhp-badge {
+    font-size: 0.72rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-weight: 700;
+  }
+  .lhp-badge-ok { background: #dcfce7; color: #14532d; }
+  .lhp-badge-warn { background: #fef3c7; color: #78350f; }
+  .lhp-badge-off { background: #fee2e2; color: #7f1d1d; }
+
+  .lhp-progress { display: none; }
+  .lhp-progress.on { display: block; }
+
+  @media (max-width: 860px) {
+    .lhp-field-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+</head>
+<body class="">
+<!-- Modernized navbar with gradient and new styling -->
+<nav class="navbar navbar-expand-lg navbar-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="index.html">
+      <img src="static/logo.png" alt="Logo" class="navbar-logo">
+      SLIS
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarNav" aria-controls="navbarNav"
+            aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link " href="index.html">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="sanctions_manage.html">Sanctions</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="screening_jobs.html">Jobs</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="data_explorer.html">Data Explorer</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="file_splitter.html">Splitting</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="rekon_ai.html">Rekon-AI</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="lhp_ai.html">LHP-AI</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <!-- Enhanced alert system with new color scheme -->
+  
+    
+  
+
+  
+<div class="card">
+  <div class="card-body">
+    <div class="lhp-shell">
+
+      <section class="lhp-hero">
+        <h3 class="lhp-title">LHP-AI</h3>
+        <p class="lhp-subtitle">
+          Ubah hasil <b>scan Kertas Kerja Pemeriksaan Lokasi</b> (PDF) menjadi
+          <b>Laporan Hasil Pemeriksaan</b> dalam format Word, memakai template resmi KUPVA BB.
+          Sistem membaca teks cetak, tanda centang tulisan tangan, dan memotong foto dokumentasi
+          langsung dari halaman scan. Satu PDF boleh berisi banyak penyelenggara sekaligus.
+        </p>
+      </section>
+
+      <section class="lhp-panel">
+        <h6>1. Unggah Scan</h6>
+        <div id="dropzone" class="lhp-dropzone">
+          <div class="mb-2"><b>Drag &amp; drop</b> file <b>PDF</b> hasil scan di sini</div>
+          <div class="small text-muted">atau pilih file di bawah</div>
+          <div class="mt-3" style="max-width: 520px; margin: 0 auto;">
+            <input class="form-control" type="file" id="fileInput" accept="application/pdf,.pdf" />
+          </div>
+          <div class="mt-2 small text-muted" id="fileHint">Belum ada file dipilih</div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+          <button id="btnExtract" class="btn btn-primary" disabled>Proses &amp; Baca Scan</button>
+          <span class="small text-muted">
+            Proses OCR berjalan lokal dan memakan waktu &plusmn;5&ndash;10 detik per halaman.
+          </span>
+        </div>
+
+        <div id="progress" class="lhp-progress mt-3">
+          <div class="progress" style="height: 0.5rem;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width: 100%"></div>
+          </div>
+          <div class="small text-muted mt-2" id="progressText">Membaca dokumen…</div>
+        </div>
+
+        <div id="alert" class="alert alert-danger mt-3" style="display:none;"></div>
+      </section>
+
+      <section id="resultPanel" class="lhp-panel" style="display:none;">
+        <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+          <h6 class="mb-0 flex-grow-1">2. Periksa &amp; Lengkapi Data</h6>
+          <span class="small text-muted" id="summary"></span>
+        </div>
+        <div class="alert alert-warning py-2 small">
+          Data berasal dari OCR tulisan tangan sehingga <b>wajib diperiksa</b>.
+          Kolom bertanda kuning tidak tersedia pada kertas kerja dan harus diisi manual
+          (alamat, jabatan, jumlah pegawai).
+        </div>
+        <div id="companies"></div>
+      </section>
+
+      <section id="generatePanel" class="lhp-panel" style="display:none;">
+        <h6>3. Buat Dokumen LHP</h6>
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="markRed" checked>
+            <label class="form-check-label small" for="markRed">
+              Tandai hasil isian dengan <b style="color:#dc2626;">warna merah</b> (memudahkan verifikasi)
+            </label>
+          </div>
+          <button id="btnGenerate" class="btn btn-success">Generate &amp; Download</button>
+          <span class="small text-muted" id="genHint"></span>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const fileInput = document.getElementById('fileInput');
+  const dropzone = document.getElementById('dropzone');
+  const fileHint = document.getElementById('fileHint');
+  const btnExtract = document.getElementById('btnExtract');
+  const btnGenerate = document.getElementById('btnGenerate');
+  const progress = document.getElementById('progress');
+  const progressText = document.getElementById('progressText');
+  const alertBox = document.getElementById('alert');
+  const resultPanel = document.getElementById('resultPanel');
+  const generatePanel = document.getElementById('generatePanel');
+  const companiesEl = document.getElementById('companies');
+  const summaryEl = document.getElementById('summary');
+
+  let selectedFile = null;
+  let state = null;   // { key, companies: [...] }
+
+  function showError(message) {
+    alertBox.textContent = message;
+    alertBox.style.display = message ? 'block' : 'none';
+  }
+
+  function setFile(file) {
+    selectedFile = file || null;
+    fileHint.textContent = selectedFile
+      ? `${selectedFile.name} (${(selectedFile.size / 1048576).toFixed(1)} MB)`
+      : 'Belum ada file dipilih';
+    btnExtract.disabled = !selectedFile;
+  }
+
+  fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
+
+  ['dragenter', 'dragover'].forEach(evt =>
+    dropzone.addEventListener(evt, e => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    }));
+  ['dragleave', 'drop'].forEach(evt =>
+    dropzone.addEventListener(evt, e => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+    }));
+  dropzone.addEventListener('drop', e => {
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) { setFile(file); }
+  });
+
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  function field(label, key, value, required) {
+    return `<div>
+      <div class="lhp-label">${esc(label)}</div>
+      <input class="form-control form-control-sm ${required ? 'lhp-required' : ''}"
+             data-field="${key}" value="${esc(value)}" />
+    </div>`;
+  }
+
+  function markButtons(idx, group, row, mark, confidence) {
+    const low = mark === null || confidence < 0.5;
+    return `<span class="lhp-mark ${low ? 'lhp-lowconf' : ''}"
+                  data-group="${group}" data-row="${row}" data-company="${idx}">
+      <button type="button" data-val="ada" class="${mark === 'ada' ? 'on-ada' : ''}">Ada</button>
+      <button type="button" data-val="tidak" class="${mark === 'tidak' ? 'on-tidak' : ''}">Tidak</button>
+      <button type="button" data-val="" class="${mark === null ? 'on-tidak' : ''}">&ndash;</button>
+    </span>`;
+  }
+
+  function checklistTable(idx, group, items, yesLabel) {
+    if (!items.length) { return '<div class="small text-muted">Tidak ada data.</div>'; }
+    const rows = items.map((item, row) => `
+      <tr>
+        <td style="width:2.5rem;">${esc(item.no)}.</td>
+        <td>${esc(item.label)}</td>
+        <td style="width:9.5rem;">${markButtons(idx, group, row, item.mark, item.confidence)}</td>
+        <td style="width:15rem;">
+          <input class="form-control form-control-sm" data-ket="${group}:${row}"
+                 value="${esc(item.keterangan)}" placeholder="keterangan" />
+        </td>
+      </tr>`).join('');
+    return `<table class="lhp-check-table">
+      <thead><tr>
+        <th></th><th>Uraian</th><th>${esc(yesLabel)}</th><th>Keterangan</th>
+      </tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  }
+
+  function remarkTable(group, items) {
+    if (!items.length) { return ''; }
+    const rows = items.map((item, row) => `
+      <tr>
+        <td style="width:2.5rem;">${esc(item.no)}.</td>
+        <td style="width:16rem;">${esc(item.label)}</td>
+        <td><input class="form-control form-control-sm" data-ket="${group}:${row}"
+                   value="${esc(item.keterangan)}" placeholder="keterangan" /></td>
+      </tr>`).join('');
+    return `<table class="lhp-check-table"><tbody>${rows}</tbody></table>`;
+  }
+
+  function photoGrid(company) {
+    if (!company.photos.length) {
+      return '<div class="small text-muted">Tidak ada foto terdeteksi pada scan.</div>';
+    }
+    return '<div class="lhp-photos">' + company.photos.map(photo => `
+      <label class="lhp-photo" data-photo="${photo.index}">
+        <img src="${photo.url}" loading="lazy" alt="foto" />
+        <div class="form-check mt-1">
+          <input class="form-check-input" type="checkbox" data-use="${photo.index}" checked>
+          <span class="small">pakai</span>
+        </div>
+        <input class="form-control form-control-sm" data-caption="${photo.index}"
+               value="${esc(photo.caption)}" placeholder="keterangan foto" />
+      </label>`).join('') + '</div>';
+  }
+
+  function statusBadge(company) {
+    const status = company.status_operasional || '';
+    if (/tidak/i.test(status)) {
+      return '<span class="lhp-badge lhp-badge-off">Tidak Beroperasi</span>';
+    }
+    if (status) { return '<span class="lhp-badge lhp-badge-ok">Beroperasi</span>'; }
+    return '<span class="lhp-badge lhp-badge-warn">Status belum terbaca</span>';
+  }
+
+  function companyCard(company, idx) {
+    const form = company.form;
+    const warn = (company.warnings || []).length
+      ? `<div class="alert alert-warning py-2 small mb-2">${company.warnings.map(esc).join('<br>')}</div>`
+      : '';
+    return `
+    <div class="lhp-company" data-company="${idx}">
+      <div class="lhp-company-head">
+        <input class="form-check-input" type="checkbox" data-select checked
+               onclick="event.stopPropagation()">
+        <h6>${esc(company.nama_penyelenggara || '(nama belum terbaca)')}</h6>
+        ${statusBadge(company)}
+        <span class="small text-muted">hal. ${company.pages.join(', ')}</span>
+        <span class="small text-muted">${company.photos.length} foto</span>
+      </div>
+      <div class="lhp-company-body">
+        ${warn}
+        <div class="lhp-field-grid mb-3">
+          ${field('Nama KUPVA BB (tanpa "PT")', 'nama_kupva', form.nama_kupva, false)}
+          ${field('Singkatan dipakai di isi laporan', 'singkatan', form.singkatan, false)}
+          ${field('Alamat kantor pusat', 'alamat', form.alamat, true)}
+          ${field('Tanggal pemeriksaan', 'tanggal_periksa', form.tanggal_periksa, false)}
+          ${field('Tanggal laporan', 'tanggal_laporan', form.tanggal_laporan, false)}
+          ${field('Nama pihak yang ditemui', 'pic_nama', form.pic_nama, false)}
+          ${field('Jabatan pihak yang ditemui', 'pic_jabatan', form.pic_jabatan, true)}
+          ${field('Jumlah pegawai', 'jumlah_pegawai', form.jumlah_pegawai, true)}
+          ${field('Pemeriksa 1', 'pemeriksa_1', form.pemeriksa_1, false)}
+          ${field('Jabatan Pemeriksa 1', 'jabatan_1', form.jabatan_1, true)}
+          ${field('Pemeriksa 2', 'pemeriksa_2', form.pemeriksa_2, false)}
+          ${field('Jabatan Pemeriksa 2', 'jabatan_2', form.jabatan_2, true)}
+        </div>
+
+        <details class="mb-3">
+          <summary class="small fw-bold">Data mentah dari kertas kerja</summary>
+          <div class="small text-muted mt-2">
+            <div><b>Hari/Tanggal:</b> ${esc(company.hari_tanggal)}</div>
+            <div><b>Tim pemeriksa:</b> ${esc((company.tim_pemeriksa || []).join(', '))}</div>
+            <div><b>No. HP PIC:</b> ${esc(company.pic_hp)}</div>
+            <div><b>E-mail:</b> ${esc(company.email)}</div>
+            <div><b>Catatan pemeriksaan:</b> ${esc((company.catatan_pemeriksaan || []).join(' | '))}</div>
+            <div class="mt-1"><b>Informasi pendukung:</b> ${esc(company.narasi)}</div>
+          </div>
+        </details>
+
+        <div class="mb-3">
+          <div class="lhp-label">Kondisi lokasi</div>
+          ${checklistTable(idx, 'lokasi', company.checklist.lokasi, 'Iya / Tidak')}
+        </div>
+
+        <div class="mb-3">
+          <div class="lhp-label">Sarana &amp; prasarana</div>
+          ${checklistTable(idx, 'sarana', company.checklist.sarana, 'Ada / Tidak')}
+        </div>
+
+        <div class="mb-3">
+          <div class="lhp-label">Manajemen</div>
+          ${remarkTable('manajemen', company.checklist.manajemen)}
+          <div class="lhp-label mt-2">Lain-lain</div>
+          ${remarkTable('lain_lain', company.checklist.lain_lain)}
+        </div>
+
+        <div class="mb-3">
+          <div class="lhp-label">Daftar sarana yang masuk ke laporan (satu baris satu item)</div>
+          <textarea class="form-control form-control-sm" rows="6"
+                    data-field="sarana_items">${esc((form.sarana_items || []).join('\n'))}</textarea>
+        </div>
+
+        <div class="mb-3">
+          <div class="lhp-label">
+            Temuan / hal signifikan (satu baris satu poin)
+            <span class="fw-normal">&mdash; disusun dari paragraf "Informasi pendukung" di bawah</span>
+          </div>
+          ${company.narasi ? `<div class="lhp-narasi mb-2">${esc(company.narasi)}</div>` : ''}
+          <textarea class="form-control form-control-sm" rows="5"
+                    data-field="temuan_items">${esc((form.temuan_items || []).join('\n'))}</textarea>
+        </div>
+
+        <div class="mb-3">
+          <div class="lhp-label">Kalimat tindak lanjut / komitmen perbaikan</div>
+          <textarea class="form-control form-control-sm" rows="2"
+                    data-field="komitmen">${esc(form.komitmen)}</textarea>
+        </div>
+
+        <div class="mb-2">
+          <div class="lhp-label">Foto dokumentasi (masuk ke lampiran)</div>
+          ${photoGrid(company)}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function render() {
+    companiesEl.innerHTML = state.companies.map(companyCard).join('');
+    summaryEl.textContent =
+      `${state.companies.length} penyelenggara · ${state.page_count} halaman · ${state.elapsed}s`;
+    resultPanel.style.display = 'block';
+    generatePanel.style.display = 'block';
+
+    companiesEl.querySelectorAll('.lhp-company-head').forEach(head => {
+      head.addEventListener('click', () => {
+        const body = head.nextElementSibling;
+        body.style.display = body.style.display === 'none' ? 'block' : 'none';
+      });
+    });
+
+    // Tick buttons: keep the chosen answer in the DOM so collect() can read it.
+    companiesEl.querySelectorAll('.lhp-mark').forEach(group => {
+      group.querySelectorAll('button').forEach(button => {
+        button.addEventListener('click', () => {
+          group.querySelectorAll('button').forEach(other => {
+            other.classList.remove('on-ada', 'on-tidak');
+          });
+          const value = button.dataset.val;
+          if (value === 'ada') { button.classList.add('on-ada'); }
+          else { button.classList.add('on-tidak'); }
+          group.dataset.value = value;
+          group.classList.remove('lhp-lowconf');
+          syncSarana(group.closest('.lhp-company'));
+        });
+      });
+      const active = group.querySelector('.on-ada, .on-tidak');
+      group.dataset.value = active ? active.dataset.val : '';
+    });
+
+    companiesEl.querySelectorAll('[data-use]').forEach(box => {
+      box.addEventListener('change', () => {
+        box.closest('.lhp-photo').classList.toggle('off', !box.checked);
+      });
+    });
+  }
+
+  // Rebuild the facilities textarea when the examiner corrects a tick.
+  function syncSarana(card) {
+    const idx = Number(card.dataset.company);
+    const company = state.companies[idx];
+    const groups = card.querySelectorAll('.lhp-mark[data-group="sarana"]');
+    const items = [];
+    groups.forEach(group => {
+      const row = Number(group.dataset.row);
+      const item = company.checklist.sarana[row];
+      if (!item || group.dataset.value !== 'ada') { return; }
+      if (/lain-lain/i.test(item.label)) { return; }
+      items.push(company.sarana_narrative[row] || item.label);
+    });
+    const box = card.querySelector('[data-field="sarana_items"]');
+    if (box) { box.value = items.join('\n'); }
+  }
+
+  function collect() {
+    const out = [];
+    companiesEl.querySelectorAll('.lhp-company').forEach(card => {
+      if (!card.querySelector('[data-select]').checked) { return; }
+      const idx = Number(card.dataset.company);
+      const form = {};
+      card.querySelectorAll('[data-field]').forEach(input => {
+        form[input.dataset.field] = input.value;
+      });
+      const photos = [];
+      const captions = {};
+      card.querySelectorAll('[data-use]').forEach(box => {
+        if (box.checked) { photos.push(Number(box.dataset.use)); }
+      });
+      card.querySelectorAll('[data-caption]').forEach(input => {
+        captions[input.dataset.caption] = input.value;
+      });
+      out.push({ index: idx, form: form, photos: photos, captions: captions });
+    });
+    return out;
+  }
+
+  btnExtract.addEventListener('click', async () => {
+    if (!selectedFile) { return; }
+    showError('');
+    btnExtract.disabled = true;
+    progress.classList.add('on');
+    progressText.textContent =
+      'Membaca dokumen… proses OCR berjalan di server dan bisa memakan beberapa menit.';
+
+    const body = new FormData();
+    body.append('file', selectedFile);
+    try {
+      const response = await fetch('/api/lhp-ai/extract', { method: 'POST', body: body });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Gagal memproses dokumen.');
+      }
+      // Remember the narrative phrasing so tick edits can rebuild the list.
+      data.companies.forEach(company => {
+        company.sarana_narrative = company.checklist.sarana.map((item, n) =>
+          (company.form.sarana_items || [])[n] || item.label);
+      });
+      state = data;
+      render();
+    } catch (err) {
+      showError(err.message || String(err));
+    } finally {
+      progress.classList.remove('on');
+      btnExtract.disabled = false;
+    }
+  });
+
+  btnGenerate.addEventListener('click', async () => {
+    if (!state) { return; }
+    const companies = collect();
+    if (!companies.length) {
+      showError('Pilih minimal satu penyelenggara.');
+      return;
+    }
+    showError('');
+    btnGenerate.disabled = true;
+    document.getElementById('genHint').textContent = 'Menyusun dokumen…';
+    try {
+      const response = await fetch('/api/lhp-ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: state.key,
+          companies: companies,
+          mark_red: document.getElementById('markRed').checked,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal membuat dokumen.');
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = match ? decodeURIComponent(match[1]) : 'LHP.docx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      document.getElementById('genHint').textContent = 'Selesai.';
+    } catch (err) {
+      showError(err.message || String(err));
+      document.getElementById('genHint').textContent = '';
+    } finally {
+      btnGenerate.disabled = false;
+    }
+  });
+})();
+</script>
+
+</main>
+
+<script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+></script>
+
+
+</body>
+</html>

@@ -1,0 +1,935 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SLIS - Sanction List Screening System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap 5 CDN -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+    crossorigin="anonymous"
+  >
+
+  <!-- Google Fonts for modern typography -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* Complete redesign: modern color system, typography, and layout */
+    :root {
+      --primary: #0f172a;
+      --primary-light: #1e293b;
+      --primary-accent: #0ea5e9;
+      --secondary: #6366f1;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --background: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --text-light: #94a3b8;
+
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.10);
+      --shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.16);
+      --ring: 0 0 0 3px rgba(14, 165, 233, 0.18);
+    }
+
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    body {
+      --app-bg-opacity: 0.24;
+      --app-bg-blur: 3px;
+      --app-particles-opacity: 0.18;
+      background-color: var(--background);
+      position: relative;
+      isolation: isolate;
+      color: var(--text-primary);
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
+
+    /* App background (all pages): blurred image + soft gradient */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(135deg, rgba(2, 6, 23, 0.44) 0%, rgba(2, 6, 23, 0.10) 45%, rgba(2, 6, 23, 0.32) 100%),
+        url("static/bgutama.png");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: var(--app-bg-opacity);
+      filter: blur(var(--app-bg-blur)) saturate(1.08) contrast(1.02);
+      transform: scale(1.04);
+      z-index: -2;
+      pointer-events: none;
+    }
+
+    /* Subtle particle overlay (all pages) */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: -20vh -20vw;
+      z-index: -1;
+      pointer-events: none;
+      opacity: var(--app-particles-opacity);
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.30) 0 1px, transparent 2px),
+        radial-gradient(circle at 30% 80%, rgba(255, 255, 255, 0.22) 0 1px, transparent 2px),
+        radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.18) 0 1px, transparent 2px),
+        radial-gradient(circle at 85% 65%, rgba(255, 255, 255, 0.20) 0 1px, transparent 2px),
+        radial-gradient(circle at 55% 15%, rgba(255, 255, 255, 0.14) 0 1px, transparent 2px),
+        radial-gradient(circle at 45% 55%, rgba(255, 255, 255, 0.16) 0 1px, transparent 2px);
+      background-size: 220px 220px, 260px 260px, 240px 240px, 300px 300px, 280px 280px, 320px 320px;
+      background-repeat: repeat;
+      filter: blur(0.2px);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      body::after {
+        animation: particleDrift 22s linear infinite;
+      }
+      @keyframes particleDrift {
+        0% { transform: translate3d(0, 0, 0); }
+        100% { transform: translate3d(80px, -60px, 0); }
+      }
+    }
+
+    a { transition: color 0.2s ease, opacity 0.2s ease; }
+
+    /* Gentle page entrance */
+    @media (prefers-reduced-motion: no-preference) {
+      main.container { animation: fadeUp 420ms ease both; }
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    }
+
+    /* Home modifier (optional): slightly stronger background */
+    body.home-bg {
+      --app-bg-opacity: 0.28;
+      --app-particles-opacity: 0.22;
+    }
+
+    /* Navbar Styling */
+    .navbar {
+      background:
+        linear-gradient(90deg, rgba(0, 85, 150, 0.94) 0%, rgba(11, 107, 181, 0.92) 55%, rgba(0, 85, 150, 0.94) 100%);
+      padding: 0.75rem 0;
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.18);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 1030;
+    }
+
+    .navbar .container-fluid {
+      max-width: 1200px;
+      padding-left: 1.25rem;
+      padding-right: 1.25rem;
+    }
+
+    .navbar-brand {
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: rgba(255, 255, 255, 0.96) !important;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.25rem 0;
+    }
+
+    .navbar-brand:hover {
+      opacity: 0.92;
+    }
+
+    .navbar-logo {
+      width: clamp(72px, 6vw, 112px);
+      height: auto;
+      max-height: 96px;
+      object-fit: contain;
+    }
+
+    .nav-link {
+      color: rgba(255, 255, 255, 0.86) !important;
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 0.55rem 0.9rem !important;
+      border-radius: 999px;
+      transition: all 0.2s ease;
+      position: relative;
+      line-height: 1.1;
+    }
+
+    .nav-link:hover {
+      background-color: rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.98) !important;
+    }
+
+    .nav-link.active {
+      background-color: rgba(255, 255, 255, 0.20);
+      color: rgba(255, 255, 255, 0.98) !important;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      display: none;
+    }
+
+    .navbar-toggler {
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 10px;
+      padding: 0.45rem 0.6rem;
+      box-shadow: 0 6px 18px rgba(2, 6, 23, 0.14);
+    }
+
+    .navbar-toggler:focus {
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+    }
+
+    @media (max-width: 991.98px) {
+      .navbar .navbar-nav {
+        padding-top: 0.5rem;
+        gap: 0.25rem;
+      }
+      .nav-link {
+        border-radius: 10px;
+      }
+    }
+
+    /* Main Container */
+    main.container {
+      max-width: 1200px;
+      padding: 1.5rem;
+    }
+
+    /* Glass utility (optional) */
+    .glass {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* Alerts */
+    .alert {
+      border-radius: 8px;
+      border: none;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .alert-success {
+      background-color: #ecfdf5;
+      color: #065f46;
+    }
+
+    .alert-danger {
+      background-color: #fef2f2;
+      color: #7f1d1d;
+    }
+
+    .alert-warning {
+      background-color: #fffbeb;
+      color: #78350f;
+    }
+
+    .alert-info {
+      background-color: #f0f9ff;
+      color: #0c2d6b;
+    }
+
+    /* Button Styles */
+    .btn {
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 0.6rem 1.2rem;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .btn-sm {
+      padding: 0.45rem 0.85rem;
+      font-size: 0.85rem;
+      border-radius: 10px;
+    }
+
+    .btn:focus-visible {
+      outline: none;
+      box-shadow: var(--ring);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary-accent), #38bdf8);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #0284c7;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, var(--secondary), #8b5cf6);
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background-color: #4f46e5;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, var(--success), #22c55e);
+      color: white;
+    }
+
+    .btn-success:hover {
+      background-color: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-warning {
+      background: linear-gradient(135deg, var(--warning), #fb923c);
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background-color: #d97706;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-lg {
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+    }
+
+    .btn-link {
+      color: var(--primary-accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .btn-link:hover {
+      color: #0284c7;
+      text-decoration: underline;
+    }
+
+    /* Card Styles */
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+      background-color: var(--surface);
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      background-color: var(--background);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .card-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .card-text {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    /* Form Elements */
+    .form-label {
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.625rem 0.875rem;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      background-color: var(--surface);
+      color: var(--text-primary);
+    }
+
+    .form-control:focus, .form-select:focus {
+      border-color: var(--primary-accent);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+      outline: none;
+    }
+
+    .form-text {
+      color: var(--text-light);
+      font-size: 0.85rem;
+      margin-top: 0.25rem;
+    }
+
+    /* Badge Styles */
+    .badge {
+      border-radius: 20px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .bg-success {
+      background-color: var(--success) !important;
+    }
+
+    .bg-warning {
+      background-color: var(--warning) !important;
+    }
+
+    .bg-danger {
+      background-color: var(--danger) !important;
+    }
+
+    /* Table Styles */
+    .table {
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .table thead {
+      background-color: var(--background);
+      border-bottom: 2px solid var(--border);
+    }
+
+    .table th {
+      font-weight: 600;
+      color: var(--text-primary);
+      padding: 1rem 0.75rem;
+    }
+
+    .table td {
+      padding: 0.875rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    .table-striped tbody tr:hover {
+      background-color: rgba(14, 165, 233, 0.03);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      main.container {
+        padding: 1rem;
+      }
+
+      .navbar-brand {
+        font-size: 1.25rem;
+      }
+
+      .nav-link {
+        padding: 0.75rem 0.5rem !important;
+      }
+    }
+  </style>
+
+  
+<style>
+  /* Landing page (The Lobby) - Clean, action-focused design */
+  .lobby-container {
+    min-height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: transparent;
+    padding: 1.25rem;
+    position: relative;
+    overflow: visible;
+  }
+
+  /* Glassy surface to keep readability on top of bg image */
+  .lobby-surface {
+    width: min(980px, 100%);
+    padding: 1.75rem;
+    border-radius: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+  }
+
+  .lobby-header {
+    width: 100%;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 2.25rem;
+  }
+
+  .lobby-header h1 {
+    font-size: clamp(1.65rem, 2.4vw, 2.35rem);
+    font-weight: 800;
+    font-style: normal;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.5px;
+    text-rendering: geometricPrecision;
+    font-synthesis: none;
+    transform: none;
+  }
+
+  .lobby-header h1,
+  .lobby-header p {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .lobby-header p {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+  }
+
+  .lobby-tagline {
+    display: inline-block;
+    border-radius: 20px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+  }
+
+  /* Hero Actions Grid */
+  .lobby-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2.25rem;
+    max-width: 900px;
+  }
+
+  .hero-card {
+    --card-accent: var(--primary-accent);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, transparent 0%, var(--card-accent) 45%, transparent 100%);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 260ms ease;
+    opacity: 0.95;
+    pointer-events: none;
+  }
+
+  .hero-card::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background:
+      radial-gradient(420px 140px at 50% 0%, color-mix(in srgb, var(--card-accent) 18%, transparent), transparent 60%);
+    opacity: 0;
+    transition: opacity 260ms ease;
+    pointer-events: none;
+  }
+
+  .hero-card.quick-search {
+    --card-accent: var(--secondary);
+  }
+
+  .hero-card.bulk-screening {
+    --card-accent: var(--primary-accent);
+  }
+
+  .hero-card:hover {
+    border-color: rgba(148, 163, 184, 0.9);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .hero-card:hover::before {
+    transform: scaleX(1);
+  }
+
+  .hero-card:hover::after {
+    opacity: 1;
+  }
+
+  .hero-icon {
+    font-size: 2.75rem;
+    margin-bottom: 1.15rem;
+    display: block;
+    filter: drop-shadow(0 10px 14px rgba(15, 23, 42, 0.14));
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-card:hover .hero-icon {
+      animation: iconFloat 900ms ease-in-out infinite alternate;
+    }
+    @keyframes iconFloat {
+      from { transform: translateY(0); }
+      to { transform: translateY(-3px); }
+    }
+  }
+
+  .hero-card h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+  }
+
+  .hero-card p {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    margin-bottom: 1.75rem;
+  }
+
+  .hero-card .btn {
+    width: 100%;
+    padding: 0.72rem 1.2rem;
+    font-weight: 600;
+  }
+
+  /* Sanction List Status widget (in-flow to avoid overlapping content) */
+  .version-widget {
+    position: static;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    box-shadow: var(--shadow-sm);
+    width: 100%;
+    margin-top: 1.5rem;
+  }
+
+  .version-widget-title {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+  }
+
+  .version-widget-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .version-info {
+    flex: 1;
+  }
+
+  .version-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-bottom: 0.25rem;
+  }
+
+  .version-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .version-badge {
+    display: inline-block;
+    background-color: var(--success);
+    color: white;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .btn-update-list {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    background-color: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-update-list:hover {
+    background-color: var(--background);
+    border-color: var(--text-light);
+  }
+
+  /* Quick Stats */
+  .lobby-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2.25rem;
+    max-width: 900px;
+    padding: 0;
+    background: transparent;
+    border: none;
+  }
+
+  .stat-item {
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--primary-accent);
+    margin-bottom: 0.25rem;
+  }
+
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .lobby-container {
+      padding: 1rem;
+    }
+
+    .lobby-header h1 {
+      font-size: 1.8rem;
+    }
+
+    .lobby-header p {
+      font-size: 0.95rem;
+    }
+
+    .lobby-actions {
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+
+    .hero-card {
+      padding: 1.5rem;
+    }
+
+    .hero-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .hero-card h2 {
+      font-size: 1.2rem;
+    }
+
+    .version-widget {
+      margin-top: 2rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .lobby-stats {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .lobby-header h1 {
+      font-size: 1.5rem;
+    }
+
+    .hero-card {
+      padding: 1.5rem;
+    }
+
+    .hero-card h2 {
+      font-size: 1rem;
+    }
+
+    .hero-card p {
+      font-size: 0.85rem;
+    }
+
+    .lobby-stats {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+</head>
+<body class="home-bg">
+<!-- Modernized navbar with gradient and new styling -->
+<nav class="navbar navbar-expand-lg navbar-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="index.html">
+      <img src="static/logo.png" alt="Logo" class="navbar-logo">
+      SLIS
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarNav" aria-controls="navbarNav"
+            aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link active" href="index.html">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="sanctions_manage.html">Sanctions</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="screening_jobs.html">Jobs</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="data_explorer.html">Data Explorer</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="file_splitter.html">Splitting</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="rekon_ai.html">Rekon-AI</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="lhp_ai.html">LHP-AI</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <!-- Enhanced alert system with new color scheme -->
+  
+    
+  
+
+  
+<div class="lobby-container">
+  <div class="lobby-surface">
+    <!-- Header -->
+    <div class="lobby-header">
+      <div class="lobby-tagline">Sistem Keamanan Pembayaran</div>
+      <h1>Sanction List Intelligence Screening</h1>
+      <p>Lakukan screening nama, DOB, dan citizenship nasabah terhadap sanction list dengan akurat dan cepat.</p>
+    </div>
+
+    <!-- Main Actions -->
+    <div class="lobby-actions">
+      <!-- Quick Search -->
+      <div class="hero-card quick-search">
+        <span class="hero-icon">🔍</span>
+        <h2>Quick Search</h2>
+        <p>Screening instan untuk satu nasabah. Ketik nama dan dapatkan hasil langsung.</p>
+        <a href="search.html" class="btn btn-secondary">Mulai Pencarian</a>
+      </div>
+
+      <!-- Bulk Screening -->
+      <div class="hero-card bulk-screening">
+        <span class="hero-icon">📊</span>
+        <h2>Bulk Screening</h2>
+        <p>Upload file batch transaksi dan jalankan screening otomatis untuk ribuan records.</p>
+        <a href="sanctions_upload.html" class="btn btn-primary">Mulai Screening</a>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="lobby-stats">
+      <div class="stat-item">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Entitas Sanksi</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Batch Terproses</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Screening Jobs</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Jumlah Jenis Sanction List</div>
+      </div>
+    </div>
+
+    <div class="version-widget">
+      <div class="version-widget-title">Sanction List Status</div>
+      <div class="version-widget-content">
+        <div class="version-info">
+          <div class="version-label">Version</div>
+          <div class="version-value">-</div>
+          <div style="margin-top: 0.5rem;">
+            <span class="version-badge" title="">Updated -</span>
+          </div>
+        </div>
+        <a class="btn-update-list" href="sanctions_manage.html">Update List</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+></script>
+
+
+</body>
+</html>
